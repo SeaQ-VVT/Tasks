@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Quản lý công việc Trello Style</title>
+<title>Task Manager Trello Style</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <style>
 body { font-family: Arial, sans-serif; background: #f4f5f7; margin: 0; }
 header { background: #026aa7; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
 header h1 { font-size: 20px; }
-#loginPanel, #adminPanel { margin: 10px; }
+#loginPanel, #adminPanel, #projectPanel { margin: 10px; }
 .board { display: flex; gap: 10px; padding: 10px; overflow-x: auto; }
 .column { background: #ebecf0; border-radius: 5px; width: 300px; padding: 10px; flex-shrink: 0; }
 .column h3 { margin-top: 0; }
@@ -26,48 +26,57 @@ header h1 { font-size: 20px; }
 <body>
 
 <header>
-  <h1>Quản lý công việc</h1>
+  <h1>Task Manager</h1>
   <div>
     <span id="userStatus"></span>
-    <button id="logoutBtn" style="display:none;">Đăng xuất</button>
+    <button id="logoutBtn" style="display:none;">Logout</button>
   </div>
 </header>
 
 <div id="loginPanel">
-  <input type="text" id="loginUsername" placeholder="Tên đăng nhập">
-  <input type="password" id="loginPassword" placeholder="Mật khẩu">
-  <button id="loginBtn">Đăng nhập</button>
+  <input type="text" id="loginUsername" placeholder="Username">
+  <input type="password" id="loginPassword" placeholder="Password">
+  <button id="loginBtn">Login</button>
 </div>
 
 <div id="adminPanel" style="display:none;">
-  <h3>Tạo tài khoản mới (Admin)</h3>
-  <input type="text" id="newUsername" placeholder="Tên đăng nhập mới">
-  <input type="password" id="newPassword" placeholder="Mật khẩu ban đầu">
-  <button id="createUserBtn">Tạo tài khoản</button>
+  <h3>Create New Account (Admin)</h3>
+  <input type="text" id="newUsername" placeholder="New username">
+  <input type="password" id="newPassword" placeholder="Initial password">
+  <button id="createUserBtn">Create</button>
 </div>
 
-<div class="board">
-  <div class="column" id="todoColumn">
-    <h3>Todo</h3>
-    <div class="task-list" id="todoList"></div>
-    <button id="addTodoTask">+ Thêm task</button>
-  </div>
-  <div class="column" id="processColumn">
-    <h3>Process</h3>
-    <div class="task-list" id="processList"></div>
-  </div>
-  <div class="column" id="doneColumn">
-    <h3>Done</h3>
-    <div class="task-list" id="doneList"></div>
+<div id="projectPanel" style="display:none;">
+  <h3>Projects</h3>
+  <button id="addProjectBtn">+ Add Project</button>
+  <ul id="projectList"></ul>
+</div>
+
+<div id="boardPanel" style="display:none;">
+  <button id="backToProjects">← Back to Projects</button>
+  <div class="board">
+    <div class="column" id="todoColumn">
+      <h3>Todo</h3>
+      <div class="task-list" id="todoList"></div>
+      <button id="addTodoTask">+ Add Task</button>
+    </div>
+    <div class="column" id="processColumn">
+      <h3>Process</h3>
+      <div class="task-list" id="processList"></div>
+    </div>
+    <div class="column" id="doneColumn">
+      <h3>Done</h3>
+      <div class="task-list" id="doneList"></div>
+    </div>
   </div>
 </div>
 
 <div id="commentPopup">
-  <h3>Bình luận</h3>
+  <h3>Comments</h3>
   <div id="commentList"></div>
-  <input type="text" id="commentInput" placeholder="Viết bình luận...">
-  <button id="sendCommentBtn">Gửi</button>
-  <button onclick="closeCommentPopup()">Đóng</button>
+  <input type="text" id="commentInput" placeholder="Write a comment...">
+  <button id="sendCommentBtn">Send</button>
+  <button onclick="closeCommentPopup()">Close</button>
 </div>
 
 <script type="module">
@@ -90,17 +99,18 @@ const db = getFirestore(app);
 
 const ADMIN_EMAIL = "admin@myapp.com";
 let currentUser = null;
+let currentProjectId = null;
 let currentCommentTaskId = null;
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
-  if (!username || !password) return alert("Nhập đủ thông tin");
+  if (!username || !password) return alert("Enter all fields");
   const email = `${username}@myapp.com`;
   try {
     await signInWithEmailAndPassword(auth, email, password);
   } catch {
-    alert("Sai thông tin đăng nhập");
+    alert("Invalid login");
   }
 });
 
@@ -112,17 +122,68 @@ onAuthStateChanged(auth, user => {
     document.getElementById('userStatus').textContent = user.email;
     document.getElementById('logoutBtn').style.display = 'inline-block';
     document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('projectPanel').style.display = 'block';
     if (user.email === ADMIN_EMAIL) {
       document.getElementById('adminPanel').style.display = 'block';
     } else {
       document.getElementById('adminPanel').style.display = 'none';
     }
+    loadProjects();
   } else {
-    document.getElementById('userStatus').textContent = 'Khách';
+    document.getElementById('userStatus').textContent = 'Guest';
     document.getElementById('logoutBtn').style.display = 'none';
     document.getElementById('loginPanel').style.display = 'block';
     document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('projectPanel').style.display = 'none';
+    document.getElementById('boardPanel').style.display = 'none';
   }
+});
+
+document.getElementById('addProjectBtn').addEventListener('click', async () => {
+  const name = prompt("Project name:");
+  if (!name) return;
+  await addDoc(collection(db, "projects"), {
+    name,
+    createdAt: serverTimestamp()
+  });
+});
+
+function loadProjects() {
+  const list = document.getElementById('projectList');
+  list.innerHTML = '';
+  onSnapshot(collection(db, "projects"), snap => {
+    list.innerHTML = '';
+    snap.forEach(docSnap => {
+      const li = document.createElement('li');
+      li.textContent = docSnap.data().name;
+      li.style.cursor = 'pointer';
+      li.onclick = () => openProject(docSnap.id);
+      list.appendChild(li);
+    });
+  });
+}
+
+function openProject(projectId) {
+  currentProjectId = projectId;
+  document.getElementById('projectPanel').style.display = 'none';
+  document.getElementById('boardPanel').style.display = 'block';
+  loadTasks();
+}
+
+document.getElementById('backToProjects').addEventListener('click', () => {
+  currentProjectId = null;
+  document.getElementById('boardPanel').style.display = 'none';
+  document.getElementById('projectPanel').style.display = 'block';
+});
+
+document.getElementById('addTodoTask').addEventListener('click', async () => {
+  const title = prompt("Task title:");
+  if (!title) return;
+  await addDoc(collection(db, "projects", currentProjectId, "tasks"), {
+    title,
+    status: "todo",
+    createdAt: serverTimestamp()
+  });
 });
 
 function renderTask(taskId, taskData, columnEl) {
@@ -139,7 +200,7 @@ function renderTask(taskId, taskData, columnEl) {
 }
 
 function loadTasks() {
-  onSnapshot(collection(db, "tasks"), snapshot => {
+  onSnapshot(collection(db, "projects", currentProjectId, "tasks"), snapshot => {
     document.getElementById('todoList').innerHTML = '';
     document.getElementById('processList').innerHTML = '';
     document.getElementById('doneList').innerHTML = '';
@@ -151,7 +212,6 @@ function loadTasks() {
     });
   });
 }
-loadTasks();
 
 function openCommentPopup(taskId) {
   currentCommentTaskId = taskId;
@@ -163,10 +223,10 @@ function closeCommentPopup() {
   document.getElementById('commentPopup').style.display = 'none';
 }
 
-async function loadComments(taskId) {
+function loadComments(taskId) {
   const commentList = document.getElementById('commentList');
   commentList.innerHTML = '';
-  onSnapshot(collection(db, "tasks", taskId, "comments"), snapshot => {
+  onSnapshot(collection(db, "projects", currentProjectId, "tasks", taskId, "comments"), snapshot => {
     commentList.innerHTML = '';
     snapshot.forEach(c => {
       const d = c.data();
@@ -182,13 +242,13 @@ document.getElementById('sendCommentBtn').addEventListener('click', async () => 
   if (!currentCommentTaskId) return;
   const text = document.getElementById('commentInput').value.trim();
   if (!text) return;
-  await addDoc(collection(db, "tasks", currentCommentTaskId, "comments"), {
-    user: currentUser ? currentUser.email : "Ẩn danh",
+  await addDoc(collection(db, "projects", currentProjectId, "tasks", currentCommentTaskId, "comments"), {
+    user: currentUser ? currentUser.email : "Guest",
     text,
     createdAt: serverTimestamp()
   });
   document.getElementById('commentInput').value = '';
-  showToast("Có bình luận mới");
+  showToast("New comment added");
 });
 
 function showToast(msg) {
@@ -201,4 +261,5 @@ function showToast(msg) {
 </script>
 </body>
 </html>
+
 
