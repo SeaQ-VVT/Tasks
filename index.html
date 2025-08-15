@@ -1,19 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Gửi dữ liệu lên Firebase</title>
+  <meta charset="UTF-8" />
+  <title>Form gửi dữ liệu</title>
 </head>
 <body>
-  <h1>Form gửi dữ liệu</h1>
+  <h2>Form gửi dữ liệu</h2>
   <input type="text" id="name" placeholder="Nhập tên"><br><br>
   <input type="email" id="email" placeholder="Nhập email"><br><br>
-  <button onclick="saveData()">Gửi</button>
+  <button id="submit">Gửi</button>
+
+  <h3>Danh sách dữ liệu</h3>
+  <ul id="dataList"></ul>
 
   <script type="module">
+    // Import SDK Firebase
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    import { initializeFirestore, collection, addDoc, getDocs, serverTimestamp } 
+      from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
+    // Cấu hình Firebase
     const firebaseConfig = {
       apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
       authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -24,26 +30,54 @@
       measurementId: "G-FGGV4QX67R"
     };
 
+    // Khởi tạo app + Firestore (tắt cache)
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
-    async function saveData() {
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
+    const nameInput = document.getElementById('name');
+    const emailInput = document.getElementById('email');
+    const dataList = document.getElementById('dataList');
 
+    // Ghi dữ liệu mới
+    document.getElementById('submit').addEventListener('click', async () => {
+      const name = nameInput.value.trim();
+      const email = emailInput.value.trim();
+      if (!name || !email) {
+        alert("Vui lòng nhập đầy đủ tên và email!");
+        return;
+      }
       try {
         await addDoc(collection(db, "users"), {
           name: name,
           email: email,
-          createdAt: new Date()
+          createdAt: serverTimestamp()
         });
-        alert("Ghi dữ liệu thành công!");
-      } catch (e) {
-        console.error("Lỗi khi ghi dữ liệu: ", e);
+        alert("Ghi thành công!");
+        loadData(); // tải lại danh sách
+      } catch (err) {
+        console.error("Lỗi khi ghi:", err);
+      }
+    });
+
+    // Đọc dữ liệu từ Firestore
+    async function loadData() {
+      dataList.innerHTML = "";
+      try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          const li = document.createElement('li');
+          li.textContent = `${data.name || "undefined"} - ${data.email || "undefined"}`;
+          dataList.appendChild(li);
+        });
+      } catch (err) {
+        console.error("Lỗi khi đọc:", err);
       }
     }
 
-    window.saveData = saveData;
+    // Tải ngay khi mở trang
+    loadData();
   </script>
 </body>
 </html>
+
