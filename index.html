@@ -1,265 +1,754 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
 <meta charset="UTF-8">
-<title>Task Manager Trello Style</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản Lý Tác Vụ - Trello Style</title>
+<script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 <style>
-body { font-family: Arial, sans-serif; background: #f4f5f7; margin: 0; }
-header { background: #026aa7; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
-header h1 { font-size: 20px; }
-#loginPanel, #adminPanel, #projectPanel { margin: 10px; }
-.board { display: flex; gap: 10px; padding: 10px; overflow-x: auto; }
-.column { background: #ebecf0; border-radius: 5px; width: 300px; padding: 10px; flex-shrink: 0; }
-.column h3 { margin-top: 0; }
-.task { background: white; padding: 10px; border-radius: 3px; margin-bottom: 10px; box-shadow: 0 1px 0 rgba(9,30,66,.25); display: flex; justify-content: space-between; align-items: center; }
-.task .actions { display: flex; gap: 5px; }
-.task .comment-icon { color: #888; cursor: pointer; }
-.task .comment-new { color: orange; }
-.toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 14px; opacity: 0.9; }
-#commentPopup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: none; width: 400px; max-height: 80%; overflow-y: auto; }
-#commentList { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px; }
-.comment { border-bottom: 1px solid #eee; padding: 4px 0; font-size: 14px; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+  body { font-family: 'Inter', sans-serif; background: #f4f5f7; }
+  .board { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .column { background: #ebecf0; min-width: 272px; }
+  .task { cursor: grab; }
+  .task:active { cursor: grabbing; }
+  .sortable-chosen, .sortable-ghost { opacity: 0; }
+  .commented { color: #3b82f6; }
 </style>
 </head>
-<body>
+<body class="bg-gray-100 flex flex-col h-screen">
 
-<header>
-  <h1>Task Manager</h1>
-  <div>
-    <span id="userStatus"></span>
-    <button id="logoutBtn" style="display:none;">Logout</button>
-  </div>
+<!-- HEADER -->
+<header class="bg-blue-600 text-white p-4 flex justify-between items-center shadow-md">
+    <h1 class="text-xl font-bold">Quản Lý Tác Vụ</h1>
+    <div class="flex items-center gap-4">
+        <span id="userStatus" class="font-medium">Khách</span>
+        <button id="logoutBtn" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-3 rounded-full shadow-md transition-colors duration-200" style="display:none;">Đăng Xuất</button>
+    </div>
 </header>
 
-<div id="loginPanel">
-  <input type="text" id="loginUsername" placeholder="Username">
-  <input type="password" id="loginPassword" placeholder="Password">
-  <button id="loginBtn">Login</button>
-</div>
+<!-- TOAST NOTIFICATION -->
+<div id="toast" class="fixed bottom-4 right-4 bg-gray-800 text-white px-4 py-2 rounded-lg shadow-xl opacity-0 transition-opacity duration-300 z-50"></div>
 
-<div id="adminPanel" style="display:none;">
-  <h3>Create New Account (Admin)</h3>
-  <input type="text" id="newUsername" placeholder="New username">
-  <input type="password" id="newPassword" placeholder="Initial password">
-  <button id="createUserBtn">Create</button>
-</div>
+<!-- MAIN CONTENT WRAPPER -->
+<div class="flex-1 overflow-auto">
 
-<div id="projectPanel" style="display:none;">
-  <h3>Projects</h3>
-  <button id="addProjectBtn">+ Add Project</button>
-  <ul id="projectList"></ul>
-</div>
-
-<div id="boardPanel" style="display:none;">
-  <button id="backToProjects">← Back to Projects</button>
-  <div class="board">
-    <div class="column" id="todoColumn">
-      <h3>Todo</h3>
-      <div class="task-list" id="todoList"></div>
-      <button id="addTodoTask">+ Add Task</button>
+    <!-- LOGIN PANEL -->
+    <div id="loginPanel" class="flex flex-col items-center justify-center p-8 mt-16 max-w-sm mx-auto bg-white rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-4">Đăng Nhập</h2>
+        <input type="email" id="loginEmail" placeholder="Email" class="w-full px-4 py-2 mb-4 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <input type="password" id="loginPassword" placeholder="Mật khẩu" class="w-full px-4 py-2 mb-6 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <button id="loginBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">Đăng Nhập</button>
     </div>
-    <div class="column" id="processColumn">
-      <h3>Process</h3>
-      <div class="task-list" id="processList"></div>
+
+    <!-- ADMIN PANEL -->
+    <div id="adminPanel" class="p-4 mx-auto my-4 max-w-lg bg-gray-200 rounded-lg shadow-md" style="display:none;">
+        <h3 class="text-lg font-bold mb-2">Tạo Tài Khoản Mới (Quản Trị Viên)</h3>
+        <div class="flex items-center gap-2 mb-2">
+            <input type="email" id="newEmail" placeholder="Email" class="flex-1 px-3 py-1 rounded-lg border focus:outline-none">
+            <input type="password" id="newPassword" placeholder="Mật khẩu ban đầu" class="flex-1 px-3 py-1 rounded-lg border focus:outline-none">
+            <button id="createUserBtn" class="bg-green-600 text-white px-3 py-1 rounded-lg font-semibold hover:bg-green-700 transition-colors duration-200">Tạo</button>
+        </div>
     </div>
-    <div class="column" id="doneColumn">
-      <h3>Done</h3>
-      <div class="task-list" id="doneList"></div>
+
+    <!-- PROJECT PANEL -->
+    <div id="projectPanel" class="p-8 mt-10 max-w-3xl mx-auto bg-white rounded-lg shadow-md" style="display:none;">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold">Dự Án</h3>
+            <button id="addProjectBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors duration-200">+ Thêm Dự Án</button>
+        </div>
+        <ul id="projectList" class="space-y-2"></ul>
     </div>
-  </div>
+
+    <!-- BOARD PANEL -->
+    <div id="boardPanel" class="p-4" style="display:none;">
+        <div class="flex items-center mb-4 gap-2">
+            <button id="backToProjects" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-1 px-3 rounded-full transition-colors duration-200">← Trở về</button>
+            <button id="manageListsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-1 px-3 rounded-full transition-colors duration-200">Quản lý Danh sách</button>
+        </div>
+        <div class="board flex gap-4">
+            <!-- Columns will be dynamically generated here -->
+        </div>
+    </div>
 </div>
 
-<div id="commentPopup">
-  <h3>Comments</h3>
-  <div id="commentList"></div>
-  <input type="text" id="commentInput" placeholder="Write a comment...">
-  <button id="sendCommentBtn">Send</button>
-  <button onclick="closeCommentPopup()">Close</button>
+<!-- COMMENT POPUP -->
+<div id="commentPopup" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-40" style="display:none;">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-2xl font-bold mb-4">Bình Luận</h3>
+        <div id="commentList" class="max-h-64 overflow-y-auto mb-4 border border-gray-300 rounded-lg p-2 space-y-2"></div>
+        <div class="flex gap-2">
+            <input type="text" id="commentInput" placeholder="Viết bình luận..." class="flex-1 px-3 py-2 rounded-lg border focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button id="sendCommentBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors duration-200">Gửi</button>
+        </div>
+        <button onclick="closeCommentPopup()" class="w-full mt-4 bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200">Đóng</button>
+    </div>
+</div>
+
+<!-- TASK EDIT MODAL -->
+<div id="editTaskModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-40" style="display:none;">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-2xl font-bold mb-4">Chỉnh Sửa Tác Vụ</h3>
+        <form id="editTaskForm" class="space-y-4">
+            <div>
+                <label for="editTitle" class="block text-gray-700 font-bold mb-1">Tiêu đề</label>
+                <input type="text" id="editTitle" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            <div>
+                <label for="editDescription" class="block text-gray-700 font-bold mb-1">Mô tả</label>
+                <textarea id="editDescription" rows="4" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            </div>
+            <div>
+                <label for="editDueDate" class="block text-gray-700 font-bold mb-1">Ngày hết hạn</label>
+                <input type="date" id="editDueDate" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            <div>
+                <label for="editAssignedTo" class="block text-gray-700 font-bold mb-1">Chỉ định cho</label>
+                <select id="editAssignedTo" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Không chỉ định</option>
+                </select>
+            </div>
+            <div>
+                <label for="editStatus" class="block text-gray-700 font-bold mb-1">Trạng thái</label>
+                <select id="editStatus" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <!-- Options will be dynamically added -->
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 flex-1 transition-colors duration-200">Lưu</button>
+                <button type="button" id="deleteTaskBtn" class="bg-red-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-700 transition-colors duration-200">Xóa</button>
+                <button type="button" onclick="closeEditTaskModal()" class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-semibold hover:bg-gray-400 transition-colors duration-200">Hủy</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- LIST MANAGEMENT MODAL -->
+<div id="listManagementModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-40" style="display:none;">
+    <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-2xl font-bold mb-4">Quản lý Danh sách</h3>
+        <ul id="listManagementList" class="space-y-2 mb-4 max-h-64 overflow-y-auto">
+            <!-- Lists will be dynamically generated here -->
+        </ul>
+        <div class="flex gap-2 mb-4">
+            <input type="text" id="addListInput" placeholder="Tên danh sách mới..." class="flex-1 px-3 py-2 rounded-lg border focus:outline-none">
+            <button id="addListBtn" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700">Thêm</button>
+        </div>
+        <button onclick="closeListManagementModal()" class="w-full bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg hover:bg-gray-400 transition-colors duration-200">Đóng</button>
+    </div>
 </div>
 
 <script type="module">
+// Vui lòng xem hướng dẫn chi tiết về Firebase và các biến toàn cục bên dưới.
+
+// Khởi tạo các biến toàn cục từ môi trường Canvas.
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+// Khai báo import Firebase
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, serverTimestamp, getDoc, deleteDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-  authDomain: "task-manager-d18aa.firebaseapp.com",
-  projectId: "task-manager-d18aa",
-  storageBucket: "task-manager-d18aa.firebasestorage.app",
-  messagingSenderId: "1080268498085",
-  appId: "1:1080268498085:web:767434c6a2c013b961d94c",
-  measurementId: "G-FGGV4QX67R"
-};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-const ADMIN_EMAIL = "admin@myapp.com";
+// Khởi tạo ứng dụng Firebase
+let app, auth, db;
 let currentUser = null;
 let currentProjectId = null;
 let currentCommentTaskId = null;
+let currentEditingTaskId = null;
+let userList = [];
+let boardLists = [];
 
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  const username = document.getElementById('loginUsername').value.trim();
-  const password = document.getElementById('loginPassword').value.trim();
-  if (!username || !password) return alert("Enter all fields");
-  const email = `${username}@myapp.com`;
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch {
-    alert("Invalid login");
-  }
-});
+// Hằng số cho admin
+const ADMIN_EMAIL = "admin@myapp.com";
 
-document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+// Lấy tham chiếu đến các phần tử DOM
+const loginPanel = document.getElementById('loginPanel');
+const adminPanel = document.getElementById('adminPanel');
+const projectPanel = document.getElementById('projectPanel');
+const boardPanel = document.getElementById('boardPanel');
+const userStatusEl = document.getElementById('userStatus');
+const logoutBtn = document.getElementById('logoutBtn');
+const loginBtn = document.getElementById('loginBtn');
+const loginEmailInput = document.getElementById('loginEmail');
+const loginPasswordInput = document.getElementById('loginPassword');
+const newEmailInput = document.getElementById('newEmail');
+const newPasswordInput = document.getElementById('newPassword');
+const createUserBtn = document.getElementById('createUserBtn');
+const addProjectBtn = document.getElementById('addProjectBtn');
+const projectListEl = document.getElementById('projectList');
+const backToProjectsBtn = document.getElementById('backToProjects');
+const manageListsBtn = document.getElementById('manageListsBtn');
+const boardEl = document.querySelector('#boardPanel .board');
+const commentPopupEl = document.getElementById('commentPopup');
+const commentListEl = document.getElementById('commentList');
+const commentInputEl = document.getElementById('commentInput');
+const sendCommentBtn = document.getElementById('sendCommentBtn');
+const toastEl = document.getElementById('toast');
+const editTaskModal = document.getElementById('editTaskModal');
+const editTitleInput = document.getElementById('editTitle');
+const editDescriptionInput = document.getElementById('editDescription');
+const editDueDateInput = document.getElementById('editDueDate');
+const editAssignedToSelect = document.getElementById('editAssignedTo');
+const editStatusSelect = document.getElementById('editStatus');
+const editTaskForm = document.getElementById('editTaskForm');
+const deleteTaskBtn = document.getElementById('deleteTaskBtn');
+const listManagementModal = document.getElementById('listManagementModal');
+const listManagementListEl = document.getElementById('listManagementList');
+const addListInput = document.getElementById('addListInput');
+const addListBtn = document.getElementById('addListBtn');
 
-onAuthStateChanged(auth, user => {
-  currentUser = user;
-  if (user) {
-    document.getElementById('userStatus').textContent = user.email;
-    document.getElementById('logoutBtn').style.display = 'inline-block';
-    document.getElementById('loginPanel').style.display = 'none';
-    document.getElementById('projectPanel').style.display = 'block';
-    if (user.email === ADMIN_EMAIL) {
-      document.getElementById('adminPanel').style.display = 'block';
-    } else {
-      document.getElementById('adminPanel').style.display = 'none';
+// Hàm hiển thị thông báo toast
+function showToast(message) {
+    toastEl.textContent = message;
+    toastEl.style.opacity = '1';
+    setTimeout(() => {
+        toastEl.style.opacity = '0';
+    }, 3000);
+}
+
+// Khởi tạo Firebase và đăng nhập
+async function initializeFirebaseAndAuth() {
+    try {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+
+        // Đăng nhập bằng token tùy chỉnh nếu có, nếu không thì đăng nhập ẩn danh
+        if (initialAuthToken) {
+            await signInWithCustomToken(auth, initialAuthToken);
+        } else {
+            await signInAnonymously(auth);
+        }
+    } catch (error) {
+        console.error("Lỗi khi khởi tạo Firebase:", error);
+        showToast("Lỗi khi kết nối. Vui lòng thử lại.");
     }
-    loadProjects();
-  } else {
-    document.getElementById('userStatus').textContent = 'Guest';
-    document.getElementById('logoutBtn').style.display = 'none';
-    document.getElementById('loginPanel').style.display = 'block';
-    document.getElementById('adminPanel').style.display = 'none';
-    document.getElementById('projectPanel').style.display = 'none';
-    document.getElementById('boardPanel').style.display = 'none';
-  }
+}
+
+// Lắng nghe trạng thái xác thực
+onAuthStateChanged(auth, user => {
+    currentUser = user;
+    if (user) {
+        userStatusEl.textContent = user.email || 'Người dùng ẩn danh';
+        logoutBtn.style.display = 'inline-block';
+        loginPanel.style.display = 'none';
+        projectPanel.style.display = 'block';
+
+        if (user.email === ADMIN_EMAIL) {
+            adminPanel.style.display = 'block';
+        } else {
+            adminPanel.style.display = 'none';
+        }
+        loadUsers();
+        loadProjects();
+    } else {
+        userStatusEl.textContent = 'Khách';
+        logoutBtn.style.display = 'none';
+        loginPanel.style.display = 'flex';
+        adminPanel.style.display = 'none';
+        projectPanel.style.display = 'none';
+        boardPanel.style.display = 'none';
+    }
 });
 
-document.getElementById('addProjectBtn').addEventListener('click', async () => {
-  const name = prompt("Project name:");
-  if (!name) return;
-  await addDoc(collection(db, "projects"), {
-    name,
-    createdAt: serverTimestamp()
-  });
+// Tải danh sách người dùng để gán tác vụ
+function loadUsers() {
+    onSnapshot(collection(db, `artifacts/${appId}/public/data/users`), (snapshot) => {
+        userList = [];
+        editAssignedToSelect.innerHTML = '<option value="">Không chỉ định</option>';
+        snapshot.forEach(doc => {
+            const userData = doc.data();
+            userList.push(userData.email);
+            const option = document.createElement('option');
+            option.value = userData.email;
+            option.textContent = userData.email;
+            editAssignedToSelect.appendChild(option);
+        });
+    });
+}
+
+// Xử lý sự kiện đăng nhập
+loginBtn.addEventListener('click', async () => {
+    const email = loginEmailInput.value.trim();
+    const password = loginPasswordInput.value.trim();
+    if (!email || !password) {
+        showToast("Vui lòng nhập đầy đủ email và mật khẩu.");
+        return;
+    }
+    try {
+        await signInWithEmailAndPassword(auth, email, password);
+        showToast("Đăng nhập thành công!");
+    } catch (error) {
+        showToast("Email hoặc mật khẩu không hợp lệ.");
+        console.error(error);
+    }
 });
 
+// Xử lý sự kiện đăng xuất
+logoutBtn.addEventListener('click', () => {
+    signOut(auth);
+    showToast("Đã đăng xuất.");
+});
+
+// Xử lý sự kiện tạo người dùng (Admin)
+createUserBtn.addEventListener('click', async () => {
+    const email = newEmailInput.value.trim();
+    const password = newPasswordInput.value.trim();
+    if (!email || !password) {
+        showToast("Vui lòng nhập đầy đủ email và mật khẩu.");
+        return;
+    }
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await addDoc(collection(db, `artifacts/${appId}/public/data/users`), {
+            email: userCredential.user.email,
+            createdAt: serverTimestamp()
+        });
+        showToast("Tài khoản đã được tạo thành công!");
+        newEmailInput.value = '';
+        newPasswordInput.value = '';
+    } catch (error) {
+        showToast("Lỗi khi tạo tài khoản.");
+        console.error(error);
+    }
+});
+
+// Xử lý sự kiện thêm dự án mới
+addProjectBtn.addEventListener('click', async () => {
+    const name = prompt("Tên dự án mới:");
+    if (!name) return;
+    try {
+        await addDoc(collection(db, `artifacts/${appId}/public/data/projects`), {
+            name,
+            createdAt: serverTimestamp()
+        });
+        showToast("Dự án đã được thêm!");
+    } catch (error) {
+        showToast("Lỗi khi thêm dự án.");
+        console.error(error);
+    }
+});
+
+// Tải danh sách dự án
 function loadProjects() {
-  const list = document.getElementById('projectList');
-  list.innerHTML = '';
-  onSnapshot(collection(db, "projects"), snap => {
-    list.innerHTML = '';
-    snap.forEach(docSnap => {
-      const li = document.createElement('li');
-      li.textContent = docSnap.data().name;
-      li.style.cursor = 'pointer';
-      li.onclick = () => openProject(docSnap.id);
-      list.appendChild(li);
+    projectListEl.innerHTML = '';
+    onSnapshot(collection(db, `artifacts/${appId}/public/data/projects`), snap => {
+        projectListEl.innerHTML = '';
+        if (snap.empty) {
+            projectListEl.innerHTML = '<li class="text-gray-500 italic">Không có dự án nào.</li>';
+        }
+        snap.forEach(docSnap => {
+            const li = document.createElement('li');
+            li.className = 'bg-gray-200 p-3 rounded-lg shadow-sm flex justify-between items-center hover:bg-gray-300 transition-colors duration-200';
+            li.innerHTML = `
+                <span class="cursor-pointer font-medium flex-1">${docSnap.data().name}</span>
+                ${currentUser && currentUser.email === ADMIN_EMAIL ? `<button class="delete-project-btn text-red-500 hover:text-red-700 ml-2" data-id="${docSnap.id}">Xóa</button>` : ''}
+            `;
+            li.querySelector('span').onclick = () => openProject(docSnap.id);
+            const deleteBtn = li.querySelector('.delete-project-btn');
+            if(deleteBtn) {
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteProject(docSnap.id, docSnap.data().name);
+                }
+            }
+            projectListEl.appendChild(li);
+        });
     });
-  });
 }
 
+// Xóa dự án (chỉ Admin)
+async function deleteProject(projectId, projectName) {
+    if (confirm(`Bạn có chắc chắn muốn xóa dự án "${projectName}" và tất cả tác vụ của nó không?`)) {
+        try {
+            const tasksRef = collection(db, `artifacts/${appId}/public/data/projects/${projectId}/tasks`);
+            const tasksSnap = await getDocs(tasksRef);
+            tasksSnap.forEach(async (taskDoc) => {
+                const commentsRef = collection(db, `artifacts/${appId}/public/data/projects/${projectId}/tasks/${taskDoc.id}/comments`);
+                const commentsSnap = await getDocs(commentsRef);
+                commentsSnap.forEach(async (commentDoc) => {
+                    await deleteDoc(doc(db, commentsRef.path, commentDoc.id));
+                });
+                await deleteDoc(doc(db, tasksRef.path, taskDoc.id));
+            });
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/projects`, projectId));
+            showToast("Dự án đã được xóa thành công!");
+        } catch (error) {
+            showToast("Lỗi khi xóa dự án.");
+            console.error(error);
+        }
+    }
+}
+
+// Mở một dự án cụ thể
 function openProject(projectId) {
-  currentProjectId = projectId;
-  document.getElementById('projectPanel').style.display = 'none';
-  document.getElementById('boardPanel').style.display = 'block';
-  loadTasks();
+    currentProjectId = projectId;
+    projectPanel.style.display = 'none';
+    boardPanel.style.display = 'block';
+    loadLists(); // Load lists first
+    loadTasks(); // Then load tasks
 }
 
-document.getElementById('backToProjects').addEventListener('click', () => {
-  currentProjectId = null;
-  document.getElementById('boardPanel').style.display = 'none';
-  document.getElementById('projectPanel').style.display = 'block';
+// Trở về danh sách dự án
+backToProjectsBtn.addEventListener('click', () => {
+    currentProjectId = null;
+    boardPanel.style.display = 'none';
+    projectPanel.style.display = 'block';
 });
 
-document.getElementById('addTodoTask').addEventListener('click', async () => {
-  const title = prompt("Task title:");
-  if (!title) return;
-  await addDoc(collection(db, "projects", currentProjectId, "tasks"), {
-    title,
-    status: "todo",
-    createdAt: serverTimestamp()
-  });
+// Mở modal quản lý danh sách
+manageListsBtn.addEventListener('click', () => {
+    listManagementModal.style.display = 'flex';
+    loadListsForManagement();
 });
 
-function renderTask(taskId, taskData, columnEl) {
-  const div = document.createElement('div');
-  div.className = 'task';
-  div.innerHTML = `
-    <span>${taskData.title}</span>
-    <div class="actions">
-      <i class="fa-solid fa-comment comment-icon" data-id="${taskId}"></i>
-    </div>
-  `;
-  div.querySelector('.comment-icon').addEventListener('click', () => openCommentPopup(taskId));
-  columnEl.appendChild(div);
+// Đóng modal quản lý danh sách
+function closeListManagementModal() {
+    listManagementModal.style.display = 'none';
+    addListInput.value = '';
 }
 
+// Tải danh sách cho modal quản lý
+function loadListsForManagement() {
+    listManagementListEl.innerHTML = '';
+    onSnapshot(collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/lists`), snap => {
+        listManagementListEl.innerHTML = '';
+        if (snap.empty) {
+            listManagementListEl.innerHTML = '<li class="text-gray-500 italic">Không có danh sách nào.</li>';
+        }
+        snap.forEach(docSnap => {
+            const li = document.createElement('li');
+            li.className = 'bg-gray-100 p-2 rounded-lg flex justify-between items-center';
+            li.innerHTML = `
+                <span>${docSnap.data().name}</span>
+                <button class="delete-list-btn text-red-500 hover:text-red-700 ml-2" data-id="${docSnap.id}">Xóa</button>
+            `;
+            li.querySelector('.delete-list-btn').addEventListener('click', (e) => {
+                deleteList(docSnap.id, docSnap.data().name);
+            });
+            listManagementListEl.appendChild(li);
+        });
+    });
+}
+
+// Thêm danh sách mới
+addListBtn.addEventListener('click', async () => {
+    const name = addListInput.value.trim();
+    if (!name) return;
+    try {
+        await addDoc(collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/lists`), {
+            name,
+            createdAt: serverTimestamp()
+        });
+        showToast("Danh sách đã được thêm!");
+        addListInput.value = '';
+    } catch (error) {
+        showToast("Lỗi khi thêm danh sách.");
+        console.error(error);
+    }
+});
+
+// Xóa danh sách
+async function deleteList(listId, listName) {
+    if (confirm(`Bạn có chắc chắn muốn xóa danh sách "${listName}"? Tất cả các tác vụ trong danh sách này sẽ bị mất.`)) {
+        try {
+            const tasksRef = collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks`);
+            const tasksSnap = await getDocs(tasksRef);
+            // Xóa tất cả tasks trong list này
+            tasksSnap.forEach(async (taskDoc) => {
+                if (taskDoc.data().status === listId) {
+                    const commentsRef = collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${taskDoc.id}/comments`);
+                    const commentsSnap = await getDocs(commentsRef);
+                    commentsSnap.forEach(async (commentDoc) => {
+                        await deleteDoc(doc(db, commentsRef.path, commentDoc.id));
+                    });
+                    await deleteDoc(doc(db, tasksRef.path, taskDoc.id));
+                }
+            });
+            // Xóa list
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/lists`, listId));
+            showToast("Danh sách đã được xóa!");
+        } catch (error) {
+            showToast("Lỗi khi xóa danh sách.");
+            console.error(error);
+        }
+    }
+}
+
+// Tải và tạo các cột danh sách
+function loadLists() {
+    boardEl.innerHTML = '';
+    editStatusSelect.innerHTML = '';
+    onSnapshot(collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/lists`), snap => {
+        boardEl.innerHTML = '';
+        editStatusSelect.innerHTML = '';
+        boardLists = [];
+        if (snap.empty) {
+            boardEl.innerHTML = '<div class="text-gray-500 italic p-4">Không có danh sách nào. Vui lòng thêm một danh sách!</div>';
+        }
+        snap.forEach(docSnap => {
+            const listData = docSnap.data();
+            const listId = docSnap.id;
+            boardLists.push({ id: listId, name: listData.name });
+
+            // Tạo cột
+            const columnDiv = document.createElement('div');
+            columnDiv.className = 'column flex-shrink-0 w-72 rounded-lg p-3';
+            columnDiv.innerHTML = `
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-gray-700">${listData.name}</h3>
+                    <button class="add-task-btn text-gray-500 hover:text-blue-500 transition-colors duration-200" data-list-id="${listId}">+</button>
+                </div>
+                <div class="task-list space-y-2" id="list-${listId}"></div>
+            `;
+            boardEl.appendChild(columnDiv);
+
+            // Cập nhật dropdown trạng thái trong modal
+            const option = document.createElement('option');
+            option.value = listId;
+            option.textContent = listData.name;
+            editStatusSelect.appendChild(option);
+
+            // Thêm sự kiện cho nút thêm tác vụ
+            columnDiv.querySelector('.add-task-btn').addEventListener('click', async (e) => {
+                const title = prompt("Tiêu đề tác vụ:");
+                if (!title) return;
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks`), {
+                        title,
+                        status: e.target.dataset.listId,
+                        description: "",
+                        assignedTo: "",
+                        dueDate: "",
+                        createdAt: serverTimestamp(),
+                        commentsCount: 0
+                    });
+                    showToast("Tác vụ đã được thêm!");
+                } catch (error) {
+                    showToast("Lỗi khi thêm tác vụ.");
+                    console.error(error);
+                }
+            });
+        });
+        setupDragAndDrop();
+        loadTasks(); // Tải tác vụ sau khi tạo các cột
+    });
+}
+
+// Tải tất cả tác vụ từ Firebase và hiển thị
 function loadTasks() {
-  onSnapshot(collection(db, "projects", currentProjectId, "tasks"), snapshot => {
-    document.getElementById('todoList').innerHTML = '';
-    document.getElementById('processList').innerHTML = '';
-    document.getElementById('doneList').innerHTML = '';
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      if (data.status === "todo") renderTask(docSnap.id, data, document.getElementById('todoList'));
-      if (data.status === "process") renderTask(docSnap.id, data, document.getElementById('processList'));
-      if (data.status === "done") renderTask(docSnap.id, data, document.getElementById('doneList'));
+    onSnapshot(collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks`), snapshot => {
+        // Xóa tất cả tác vụ hiện tại để render lại
+        document.querySelectorAll('.task-list').forEach(list => list.innerHTML = '');
+
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const taskId = docSnap.id;
+            const columnEl = document.getElementById(`list-${data.status}`);
+            if (columnEl) {
+                renderTask(taskId, data, columnEl);
+            }
+        });
     });
-  });
 }
 
+// Hiển thị tác vụ trên bảng
+function renderTask(taskId, taskData, columnEl) {
+    const div = document.createElement('div');
+    div.className = 'task bg-white p-3 rounded-lg shadow-sm flex flex-col cursor-pointer transition-shadow duration-200 hover:shadow-md';
+    div.dataset.id = taskId;
+    div.innerHTML = `
+        <div class="flex justify-between items-center mb-1">
+            <span class="font-medium text-gray-800">${taskData.title}</span>
+            <div class="actions flex items-center gap-2">
+                <i class="fa-solid fa-comment text-gray-500 hover:text-blue-500 cursor-pointer transition-colors duration-200 ${taskData.commentsCount > 0 ? 'commented' : ''}" data-id="${taskId}"></i>
+                <span class="text-xs text-gray-500 font-bold">${taskData.commentsCount || 0}</span>
+            </div>
+        </div>
+        ${taskData.assignedTo ? `<span class="text-xs text-blue-600 font-semibold mt-1">Gán cho: ${taskData.assignedTo.split('@')[0]}</span>` : ''}
+        ${taskData.dueDate ? `<span class="text-xs text-gray-500 mt-1">Hạn: ${taskData.dueDate}</span>` : ''}
+    `;
+    div.onclick = () => openEditTaskModal(taskId);
+    div.querySelector('.comment-icon').addEventListener('click', (e) => {
+        e.stopPropagation(); // Ngăn chặn sự kiện mở modal chỉnh sửa
+        openCommentPopup(taskId);
+    });
+    columnEl.appendChild(div);
+}
+
+// Mở cửa sổ bình luận
 function openCommentPopup(taskId) {
-  currentCommentTaskId = taskId;
-  document.getElementById('commentPopup').style.display = 'block';
-  loadComments(taskId);
+    currentCommentTaskId = taskId;
+    commentPopupEl.style.display = 'flex';
+    loadComments(taskId);
 }
 
+// Đóng cửa sổ bình luận
 function closeCommentPopup() {
-  document.getElementById('commentPopup').style.display = 'none';
+    commentPopupEl.style.display = 'none';
+    currentCommentTaskId = null;
+    commentListEl.innerHTML = '';
+    commentInputEl.value = '';
 }
 
+// Tải bình luận
 function loadComments(taskId) {
-  const commentList = document.getElementById('commentList');
-  commentList.innerHTML = '';
-  onSnapshot(collection(db, "projects", currentProjectId, "tasks", taskId, "comments"), snapshot => {
-    commentList.innerHTML = '';
-    snapshot.forEach(c => {
-      const d = c.data();
-      const div = document.createElement('div');
-      div.className = 'comment';
-      div.textContent = `${d.user}: ${d.text}`;
-      commentList.appendChild(div);
+    commentListEl.innerHTML = '';
+    const commentsRef = collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${taskId}/comments`);
+    onSnapshot(commentsRef, snapshot => {
+        commentListEl.innerHTML = '';
+        if (snapshot.empty) {
+            commentListEl.innerHTML = '<p class="text-gray-500 italic">Chưa có bình luận nào.</p>';
+        }
+        snapshot.forEach(c => {
+            const d = c.data();
+            const div = document.createElement('div');
+            div.className = 'bg-gray-100 p-2 rounded-lg';
+            div.innerHTML = `<span class="font-bold text-gray-700">${d.user.split('@')[0]}</span>: ${d.text}`;
+            commentListEl.appendChild(div);
+        });
     });
-  });
 }
 
-document.getElementById('sendCommentBtn').addEventListener('click', async () => {
-  if (!currentCommentTaskId) return;
-  const text = document.getElementById('commentInput').value.trim();
-  if (!text) return;
-  await addDoc(collection(db, "projects", currentProjectId, "tasks", currentCommentTaskId, "comments"), {
-    user: currentUser ? currentUser.email : "Guest",
-    text,
-    createdAt: serverTimestamp()
-  });
-  document.getElementById('commentInput').value = '';
-  showToast("New comment added");
+// Gửi bình luận
+sendCommentBtn.addEventListener('click', async () => {
+    if (!currentCommentTaskId) return;
+    const text = commentInputEl.value.trim();
+    if (!text) return;
+
+    try {
+        const commentsCollection = collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${currentCommentTaskId}/comments`);
+        await addDoc(commentsCollection, {
+            user: currentUser.email || "Khách",
+            text,
+            createdAt: serverTimestamp()
+        });
+
+        const taskRef = doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${currentCommentTaskId}`);
+        const taskSnap = await getDoc(taskRef);
+        const commentsCount = taskSnap.data().commentsCount || 0;
+        await updateDoc(taskRef, {
+            commentsCount: commentsCount + 1
+        });
+
+        commentInputEl.value = '';
+        showToast("Bình luận đã được thêm.");
+    } catch (error) {
+        showToast("Lỗi khi thêm bình luận.");
+        console.error(error);
+    }
 });
 
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
+// Mở cửa sổ chỉnh sửa tác vụ
+async function openEditTaskModal(taskId) {
+    currentEditingTaskId = taskId;
+    try {
+        const taskRef = doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${taskId}`);
+        const docSnap = await getDoc(taskRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            editTitleInput.value = data.title || '';
+            editDescriptionInput.value = data.description || '';
+            editDueDateInput.value = data.dueDate || '';
+            editAssignedToSelect.value = data.assignedTo || '';
+            editStatusSelect.value = data.status || '';
+            editTaskModal.style.display = 'flex';
+        } else {
+            showToast("Tác vụ không tồn tại!");
+        }
+    } catch (error) {
+        showToast("Lỗi khi tải dữ liệu tác vụ.");
+        console.error(error);
+    }
 }
+
+// Đóng cửa sổ chỉnh sửa tác vụ
+function closeEditTaskModal() {
+    editTaskModal.style.display = 'none';
+    currentEditingTaskId = null;
+    editTaskForm.reset();
+}
+
+// Gửi form chỉnh sửa tác vụ
+editTaskForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!currentEditingTaskId) return;
+    try {
+        await updateDoc(doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${currentEditingTaskId}`), {
+            title: editTitleInput.value.trim(),
+            description: editDescriptionInput.value.trim(),
+            dueDate: editDueDateInput.value,
+            assignedTo: editAssignedToSelect.value,
+            status: editStatusSelect.value,
+        });
+        showToast("Tác vụ đã được cập nhật!");
+        closeEditTaskModal();
+    } catch (error) {
+        showToast("Lỗi khi cập nhật tác vụ.");
+        console.error(error);
+    }
+});
+
+// Xóa tác vụ
+deleteTaskBtn.addEventListener('click', async () => {
+    if (confirm("Bạn có chắc chắn muốn xóa tác vụ này không?")) {
+        try {
+            // Xóa bình luận liên quan trước
+            const commentsRef = collection(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${currentEditingTaskId}/comments`);
+            const commentsSnap = await getDocs(commentsRef);
+            commentsSnap.forEach(async (commentDoc) => {
+                await deleteDoc(doc(db, commentsRef.path, commentDoc.id));
+            });
+            // Sau đó xóa tác vụ
+            await deleteDoc(doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${currentEditingTaskId}`));
+            showToast("Tác vụ đã được xóa.");
+            closeEditTaskModal();
+        } catch (error) {
+            showToast("Lỗi khi xóa tác vụ.");
+            console.error(error);
+        }
+    }
+});
+
+
+// Thiết lập chức năng kéo và thả (Drag and Drop)
+function setupDragAndDrop() {
+    boardLists.forEach(list => {
+        const el = document.getElementById(`list-${list.id}`);
+        if (!el.sortable) { // Check to prevent re-initialization
+            const sortableInstance = new Sortable(el, {
+                group: 'shared', // Cho phép kéo giữa các cột
+                animation: 150,
+                onEnd: async (evt) => {
+                    const taskId = evt.item.dataset.id;
+                    const newStatus = evt.to.id.replace('list-', '');
+                    try {
+                        await updateDoc(doc(db, `artifacts/${appId}/public/data/projects/${currentProjectId}/tasks/${taskId}`), {
+                            status: newStatus
+                        });
+                        showToast(`Tác vụ đã được chuyển sang "${list.name}"!`);
+                    } catch (error) {
+                        showToast("Lỗi khi cập nhật trạng thái.");
+                        console.error(error);
+                    }
+                }
+            });
+            el.sortable = sortableInstance;
+        }
+    });
+}
+
+// Bắt đầu ứng dụng
+initializeFirebaseAndAuth();
 </script>
 </body>
 </html>
+
+
+
 
 
