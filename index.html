@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Ghi và đọc dữ liệu Firebase</title>
+  <title>Firebase Test Ghi Thật</title>
 </head>
 <body>
   <h1>Form gửi dữ liệu</h1>
@@ -15,7 +15,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    import { initializeFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
     // Cấu hình Firebase của bạn
     const firebaseConfig = {
@@ -28,42 +28,55 @@
       measurementId: "G-FGGV4QX67R"
     };
 
-    // Khởi tạo
+    // Khởi tạo Firebase + Firestore (bỏ cache offline)
     const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+    const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
     // Hàm lưu dữ liệu
     async function saveData() {
-      const name = document.getElementById("name").value;
-      const email = document.getElementById("email").value;
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+
+      if (!name || !email) {
+        alert("Vui lòng nhập đầy đủ tên và email!");
+        return;
+      }
 
       try {
-        await addDoc(collection(db, "users"), {
-          name: name,
-          email: email,
+        const docRef = await addDoc(collection(db, "users"), {
+          name,
+          email,
           createdAt: new Date()
         });
-        alert("Ghi dữ liệu thành công!");
-        loadData(); // Tải lại danh sách sau khi ghi
+        console.log("Ghi thành công ID:", docRef.id);
+        alert("Ghi thành công ID: " + docRef.id);
+        loadData();
       } catch (e) {
-        console.error("Lỗi khi ghi dữ liệu: ", e);
+        console.error("Lỗi khi ghi:", e);
+        alert("Ghi thất bại: " + e.message);
       }
     }
 
-    // Hàm đọc dữ liệu
+    // Hàm đọc dữ liệu từ Firestore
     async function loadData() {
-      const listEl = document.getElementById("data-list");
-      listEl.innerHTML = ""; // Xóa dữ liệu cũ
-      const querySnapshot = await getDocs(collection(db, "users"));
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const li = document.createElement("li");
-        li.textContent = `${data.name} - ${data.email}`;
-        listEl.appendChild(li);
-      });
+      try {
+        const listEl = document.getElementById("data-list");
+        listEl.innerHTML = "";
+        const querySnapshot = await getDocs(collection(db, "users"));
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (!data.name || !data.email) return;
+          const li = document.createElement("li");
+          li.textContent = `${data.name} - ${data.email}`;
+          listEl.appendChild(li);
+        });
+      } catch (e) {
+        console.error("Lỗi khi đọc:", e);
+        alert("Đọc dữ liệu thất bại: " + e.message);
+      }
     }
 
-    // Gắn hàm vào window để HTML gọi được
+    // Gắn hàm vào window để gọi từ HTML
     window.saveData = saveData;
 
     // Tải dữ liệu khi trang mở
@@ -71,5 +84,3 @@
   </script>
 </body>
 </html>
-
-
