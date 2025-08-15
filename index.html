@@ -1,353 +1,50 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CV của Trịnh Minh Dương - Tổ trưởng Tổ Kỹ thuật Tự động hóa</title>
-    <!-- Tải Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        /* Tùy chỉnh Font */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5; /* Nền xám nhạt cho toàn trang */
-        }
-        /* Phong cách Phần Giới thiệu (Hero Section) với Ảnh nền */
-        .header-hero {
-            background-image: url('anh1.jpg'); /* Sử dụng anh1.jpg cho nền */
-            background-size: cover;
-            background-position: center;
-            background-attachment: scroll;
-            color: #ffffff;
-            padding: 5rem 1rem; /* Khoảng đệm rộng rãi hơn */
-            min-height: 85vh; /* Đã tăng chiều cao tối thiểu đáng kể để ảnh nền phủ kín hơn */
-            border-bottom-left-radius: 3rem; /* Bo góc tròn hơn */
-            border-bottom-right-radius: 3rem;
-            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3); /* Đổ bóng mạnh hơn */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            animation: fadeInDown 1.2s ease-out; /* Hiệu ứng mờ dần từ trên xuống */
-        }
-        /* Lớp phủ để dễ đọc chữ hơn trên ảnh nền */
-        .header-hero::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.1)); /* Điều chỉnh độ trong suốt của lớp phủ */
-            z-index: 1;
-        }
-        /* Đảm bảo nội dung nằm trên lớp phủ */
-        .header-hero > * {
-            position: relative;
-            z-index: 2;
-        }
-        /* Phong cách Thẻ Nội dung CV Chính */
-        .card {
-            background-color: rgba(255, 255, 255, 0.98); /* Nền gần trắng, hơi trong suốt */
-            backdrop-filter: blur(10px); /* Hiệu ứng làm mờ mạnh hơn */
-            border-radius: 2rem; /* Bo góc rất lớn */
-            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.35), 0 15px 15px -8px rgba(0, 0, 0, 0.08); /* Đổ bóng rõ rệt hơn */
-            margin-top: 4rem; /* Đã điều chỉnh để không còn chồng lấn lên chữ "Tóm tắt" */
-            position: relative;
-            z-index: 3;
-            animation: fadeInUp 1.2s ease-out 0.3s forwards; /* Hiệu ứng mờ dần từ dưới lên với độ trễ */
-            opacity: 0; /* Bắt đầu ẩn để tạo hiệu ứng */
-        }
-        /* Phong cách Ảnh đại diện */
-        .profile-img {
-            border: 10px solid #ffffff; /* Viền trắng dày hơn */
-            box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.3), 0 8px 15px -5px rgba(0, 0, 0, 0.1); /* Đổ bóng tăng cường */
-            transition: transform 0.5s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.3s ease; /* Chuyển động mượt mà khi di chuột */
-        }
-        .profile-img:hover {
-            transform: scale(1.15) rotate(3deg); /* Hiệu ứng động hơn khi di chuột */
-            border-color: #3498db; /* Thay đổi màu viền khi di chuột */
-        }
-        /* Phong cách Tiêu đề Phần */
-        .section-title {
-            position: relative;
-            padding-bottom: 0.8rem;
-            margin-bottom: 2.2rem;
-            font-weight: 800; /* Rất đậm */
-            color: #2c3e50;
-            text-transform: uppercase;
-            letter-spacing: 0.08em; /* Khoảng cách chữ rộng hơn */
-        }
-        /* Gạch dưới cho Tiêu đề Phần */
-        .section-title::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            bottom: 0;
-            width: 80px; /* Đường kẻ dài hơn */
-            height: 6px; /* Đường kẻ dày hơn */
-            background: linear-gradient(to right, #3498db, #2ecc71); /* Gradient màu sống động */
-            border-radius: 3px;
-            animation: expandLine 1.5s ease-out forwards; /* Hiệu ứng cho đường kẻ */
-        }
-        /* Căn giữa đường kẻ tiêu đề trên màn hình nhỏ */
-        @media (max-width: 640px) {
-            .section-title {
-                text-align: center;
-            }
-            .section-title::after {
-                left: 50%;
-                transform: translateX(-50%);
-            }
-        }
-        /* Phong cách cho các mục kỹ năng */
-        .skill-item {
-            display: flex;
-            align-items: center;
-            margin-bottom: 0.75rem;
-            font-size: 1.05rem;
-            color: #4a5568;
-        }
-        .skill-item svg {
-            margin-right: 0.8rem;
-            color: #3498db;
-            flex-shrink: 0; /* Ngăn biểu tượng bị co lại */
-        }
-        /* Phong cách cho các liên kết liên hệ có biểu tượng */
-        .icon-link {
-            display: inline-flex;
-            align-items: center;
-            color: #3498db;
-            transition: color 0.3s ease, transform 0.3s ease;
-            font-weight: 600;
-        }
-        .icon-link:hover {
-            color: #2ecc71;
-            transform: translateX(5px); /* Trượt nhẹ khi di chuột */
-        }
-        .icon-link svg {
-            margin-right: 0.6rem;
-        }
-
-        /* Các hiệu ứng Animation */
-        @keyframes fadeInDown {
-            from { opacity: 0; transform: translateY(-30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes expandLine {
-            from { width: 0; }
-            to { width: 80px; }
-        }
-        .experience-entry {
-            border-left: 4px solid #3498db; /* Đường kẻ xanh bên trái */
-            padding-left: 1.5rem;
-            position: relative;
-            margin-bottom: 2rem;
-        }
-        .experience-entry::before {
-            content: '';
-            position: absolute;
-            left: -8px; /* Vị trí chấm tròn trên đường kẻ */
-            top: 0.5rem;
-            width: 16px;
-            height: 16px;
-            background-color: #2ecc71; /* Chấm tròn màu xanh lá */
-            border-radius: 50%;
-            border: 3px solid #ffffff; /* Viền trắng cho chấm tròn */
-            box-shadow: 0 0 0 2px #3498db; /* Vòng tròn xanh bên ngoài */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Gửi dữ liệu lên Firebase</title>
 </head>
-<body class="min-h-screen flex flex-col items-center pb-10">
-    <!-- Phần Giới thiệu (Header Hero Section) với Ảnh nền -->
-    <div class="header-hero w-full">
-        <img src="anh.png" alt="Ảnh đại diện Trịnh Minh Dương" class="profile-img w-48 h-48 sm:w-56 sm:h-56 rounded-full object-cover mb-8">
-        <h1 class="text-5xl sm:text-7xl font-extrabold leading-tight mb-3 text-shadow-lg drop-shadow-xl">Trịnh Minh Dương </h1>
-        <p class="text-2xl sm:text-4xl font-semibold mb-6 text-blue-200 text-shadow-md">Tổ trưởng Tổ Kỹ thuật Tự động hóa</p>
-        <p class="text-lg sm:text-xl text-gray-100 max-w-3xl px-4">
-            Một Tổ trưởng Tổ Kỹ thuật Tự động hóa giàu kinh nghiệm, chuyên sâu trong việc triển khai, lắp đặt và bảo trì các hệ thống tự động hóa phức tạp. Có khả năng lãnh đạo đội nhóm và giải quyết vấn đề hiệu quả.
-        </p>
-    </div>
+<body>
+  <h1>Form gửi dữ liệu</h1>
+  <input type="text" id="name" placeholder="Nhập tên"><br><br>
+  <input type="email" id="email" placeholder="Nhập email"><br><br>
+  <button onclick="saveData()">Gửi</button>
 
-    <!-- Thẻ Nội dung CV Chính -->
-    <div class="card w-full max-w-5xl p-8 sm:p-10 lg:p-12">
-        <!-- Phần Tóm tắt -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Tóm tắt</h2>
-            <p class="text-gray-700 leading-relaxed text-lg sm:text-xl">
-                Anh Trịnh Minh Dương là một Tổ trưởng Tổ Kỹ thuật Tự động hóa với nhiều năm kinh nghiệm thực tế trong lĩnh vực tự động hóa công nghiệp và hàng hải. Anh có kiến thức sâu rộng và kỹ năng thực hành xuất sắc trong việc cài đặt, đấu nối, lắp đặt và bảo trì các loại cảm biến, van, bơm, bồn chứa, cũng như kéo và đấu nối cáp điện, cáp tín hiệu. Với vai trò tổ trưởng, anh có khả năng quản lý dự án, điều phối đội nhóm và đảm bảo mọi công việc được hoàn thành đúng tiến độ, đạt chất lượng cao. Anh luôn cam kết mang lại các giải pháp kỹ thuật tối ưu và đáng tin cậy.
-            </p>
-        </section>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-        <!-- Phần Kỹ năng chuyên môn -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Kỹ năng chuyên môn</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div class="p-5 bg-blue-50 rounded-xl shadow-md transform hover:scale-105 transition-transform duration-300">
-                    <h3 class="font-bold text-xl text-blue-700 mb-3 flex items-center">
-                        <svg class="w-7 h-7 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM10 7v4l3 3m0 0l-3 3m3-3h-4"></path></svg>
-                        Lắp đặt & Triển khai
-                    </h3>
-                    <ul class="list-none text-gray-700 space-y-2">
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Lắp đặt cảm biến các loại</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Cài đặt & đấu nối Van, Bơm, Bồn chứa</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Kéo & đấu nối cáp điện/tín hiệu</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Lắp đặt thiết bị tự động hóa</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Thực hiện mọi công việc kỹ thuật</li>
-                    </ul>
-                </div>
-                <div class="p-5 bg-green-50 rounded-xl shadow-md transform hover:scale-105 transition-transform duration-300">
-                    <h3 class="font-bold text-xl text-green-700 mb-3 flex items-center">
-                        <svg class="w-7 h-7 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
-                        Hệ thống & Công nghệ
-                    </h3>
-                    <ul class="list-none text-gray-700 space-y-2">
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Hệ thống điều khiển tự động</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Cảm biến & Thiết bị đo lường</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Van điều khiển & Bộ truyền động</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Hệ thống bơm & đường ống</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Hệ thống điện & tủ điều khiển</li>
-                    </ul>
-                </div>
-                <div class="p-5 bg-purple-50 rounded-xl shadow-md transform hover:scale-105 transition-transform duration-300">
-                    <h3 class="font-bold text-xl text-purple-700 mb-3 flex items-center">
-                        <svg class="w-7 h-7 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-                        Quản lý & Vận hành
-                    </h3>
-                    <ul class="list-none text-gray-700 space-y-2">
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Quản lý đội kỹ thuật</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Giám sát chất lượng lắp đặt</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Bảo trì & Khắc phục sự cố</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Đọc & hiểu bản vẽ kỹ thuật</li>
-                        <li class="skill-item"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>An toàn lao động</li>
-                    </ul>
-                </div>
-            </div>
-        </section>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+      authDomain: "task-manager-d18aa.firebaseapp.com",
+      projectId: "task-manager-d18aa",
+      storageBucket: "task-manager-d18aa.firebasestorage.app",
+      messagingSenderId: "1080268498085",
+      appId: "1:1080268498085:web:767434c6a2c013b961d94c",
+      measurementId: "G-FGGV4QX67R"
+    };
 
-        <!-- Phần Kinh nghiệm làm việc -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Kinh nghiệm làm việc</h2>
-            <div class="experience-entry">
-                <h3 class="text-2xl font-semibold text-gray-800">Tổ trưởng Tổ Kỹ thuật Tự động hóa</h3>
-                <p class="text-blue-600 text-lg mb-2">Công ty ABC | TP. Hồ Chí Minh, Việt Nam | Tháng 1/2018 – Hiện tại</p>
-                <ul class="list-disc list-inside text-gray-700 mt-2 space-y-2">
-                    <li>Dẫn dắt đội kỹ thuật thực hiện lắp đặt, đấu nối và chạy thử các hệ thống tự động hóa cho các dự án công nghiệp lớn.</li>
-                    <li>Chịu trách nhiệm chính trong việc cài đặt và hiệu chỉnh các loại cảm biến, van, bơm và bồn chứa, đảm bảo hoạt động chính xác.</li>
-                    <li>Giám sát quy trình kéo và đấu nối cáp điện, cáp tín hiệu theo đúng tiêu chuẩn kỹ thuật và an toàn.</li>
-                    <li>Đào tạo và hướng dẫn các thành viên trong tổ về kỹ năng lắp đặt và khắc phục sự cố hệ thống.</li>
-                    <li>Đảm bảo chất lượng công trình và bàn giao dự án đúng tiến độ, đáp ứng yêu cầu của khách hàng.</li>
-                </ul>
-            </div>
-            <div class="experience-entry">
-                <h3 class="text-2xl font-semibold text-gray-800">Kỹ thuật viên Tự động hóa</h3>
-                <p class="text-blue-600 text-lg mb-2">Công ty XYZ | Hà Nội, Việt Nam | Tháng 3/2014 – Tháng 12/2017</p>
-                <ul class="list-disc list-inside text-gray-700 mt-2 space-y-2">
-                    <li>Tham gia lắp đặt và bảo trì các hệ thống điều khiển PLC, SCADA trong các nhà máy sản xuất.</li>
-                    <li>Thực hiện kiểm tra, sửa chữa các thiết bị điện, điện tử và cơ khí liên quan đến hệ thống tự động hóa.</li>
-                    <li>Hỗ trợ kỹ thuật cho khách hàng trong quá trình vận hành và xử lý các sự cố phát sinh.</li>
-                    <li>Đóng góp vào việc cải tiến quy trình lắp đặt và tối ưu hóa hiệu suất hệ thống.</li>
-                </ul>
-            </div>
-            <!-- Thêm các mục kinh nghiệm khác tại đây -->
-        </section>
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
 
-        <!-- Phần Học vấn -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Học vấn</h2>
-            <div class="mb-6 p-4 bg-gray-50 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold text-gray-800">Kỹ sư Tự động hóa</h3>
-                <p class="text-blue-600 text-lg">Đại học Bách khoa Hà Nội | Hà Nội, Việt Nam | 2012</p>
-            </div>
-            <div class="p-4 bg-gray-50 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold text-gray-800">Cao đẳng Kỹ thuật Điện - Tự động hóa</h3>
-                <p class="text-blue-600 text-lg">Trường Cao đẳng Kỹ thuật Cao Thắng | TP. Hồ Chí Minh, Việt Nam | 2008</p>
-            </div>
-        </section>
+    async function saveData() {
+      const name = document.getElementById("name").value;
+      const email = document.getElementById("email").value;
 
-        <!-- Phần Chứng chỉ & Đào tạo -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Chứng chỉ & Đào tạo</h2>
-            <ul class="list-disc list-inside text-gray-700 space-y-2 text-lg">
-                <li>Chứng chỉ An toàn điện công nghiệp</li>
-                <li>Khóa học Lắp đặt & Bảo trì hệ thống PLC (Siemens/Schneider)</li>
-                <li>Đào tạo về Cảm biến & Thiết bị đo lường công nghiệp</li>
-                <li>Chứng chỉ Quản lý dự án cơ bản</li>
-            </ul>
-        </section>
+      try {
+        await addDoc(collection(db, "users"), {
+          name: name,
+          email: email,
+          createdAt: new Date()
+        });
+        alert("Ghi dữ liệu thành công!");
+      } catch (e) {
+        console.error("Lỗi khi ghi dữ liệu: ", e);
+      }
+    }
 
-        <!-- Phần Dự án nổi bật (Ví dụ) -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Dự án nổi bật</h2>
-            <div class="mb-6 p-4 bg-blue-50 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold text-blue-700">Hệ thống Tự động hóa cho Nhà máy Chế biến Thực phẩm</h3>
-                <p class="text-gray-700 text-lg mb-2">Triển khai hệ thống điều khiển tự động hoàn chỉnh cho dây chuyền sản xuất mới.</p>
-                <ul class="list-disc list-inside text-gray-700 text-base space-y-1">
-                    <li>Lắp đặt và đấu nối hàng trăm cảm biến nhiệt độ, áp suất, lưu lượng và mức.</li>
-                    <li>Cài đặt và hiệu chỉnh các van điều khiển tự động, bơm và bồn trộn.</li>
-                    <li>Đảm bảo hệ thống hoạt động ổn định, đạt năng suất tăng 20% so với dự kiến.</li>
-                </ul>
-            </div>
-            <div class="p-4 bg-green-50 rounded-lg shadow-sm">
-                <h3 class="text-xl font-semibold text-green-700">Nâng cấp Hệ thống Điều khiển Trạm Bơm Nước</h3>
-                <p class="text-gray-700 text-lg mb-2">Thực hiện nâng cấp toàn diện hệ thống điều khiển và giám sát cho trạm bơm nước đô thị.</p>
-                <ul class="list-disc list-inside text-gray-700 text-base space-y-1">
-                    <li>Kéo và đấu nối hàng km cáp điều khiển và cáp nguồn mới.</li>
-                    <li>Lắp đặt các tủ điều khiển mới và tích hợp với hệ thống SCADA hiện có.</li>
-                    <li>Giảm thiểu thời gian dừng máy và tối ưu hóa hiệu suất bơm, tiết kiệm năng lượng 10%.</li>
-                </ul>
-            </div>
-        </section>
-
-        <!-- Phần Ngôn ngữ -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Ngôn ngữ</h2>
-            <ul class="list-disc list-inside text-gray-700 space-y-2 text-lg">
-                <li>Tiếng Việt: Bản ngữ</li>
-                <li>Tiếng Anh: Giao tiếp tốt</li>
-            </ul>
-        </section>
-
-        <!-- Phần Sở thích -->
-        <section class="mb-10">
-            <h2 class="section-title text-3xl sm:text-4xl">Sở thích</h2>
-            <p class="text-gray-700 text-lg leading-relaxed">
-                Ngoài công việc, anh Trịnh Minh Dương thích đọc sách về công nghệ mới, tìm hiểu về các giải pháp tự động hóa thông minh và dành thời gian cho các hoạt động thể thao ngoài trời như chạy bộ, đạp xe.
-            </p>
-        </section>
-
-        <!-- Phần Liên hệ -->
-        <section>
-            <h2 class="section-title text-3xl sm:text-4xl">Liên hệ</h2>
-            <div class="text-gray-700 text-lg space-y-4">
-                <p>
-                    <a href="mailto:duong.trinhminh@example.com" class="icon-link">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8m-18 4v7a2 2 0 002 2h14a2 2 0 002-2v-7m-18 0V5a2 2 0 012-2h14a2 2 0 012 2v7"></path></svg>
-                        duong.trinhminh@example.com
-                    </a>
-                </p>
-                <p>
-                    <a href="tel:+84987654321" class="icon-link">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                        +84 987 654 321
-                    </a>
-                </p>
-                <p>
-                    <a href="https://www.linkedin.com/in/trinhminhduong" target="_blank" class="icon-link">
-                        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"></path></svg>
-                        linkedin.com/in/trinhminhduong
-                    </a>
-                </p>
-            </div>
-        </section>
-    </div>
+    window.saveData = saveData;
+  </script>
 </body>
 </html>
+
