@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Gửi dữ liệu lên Firebase</title>
+  <title>Ghi và đọc dữ liệu Firebase</title>
 </head>
 <body>
   <h1>Form gửi dữ liệu</h1>
@@ -10,10 +10,14 @@
   <input type="email" id="email" placeholder="Nhập email"><br><br>
   <button onclick="saveData()">Gửi</button>
 
+  <h2>Danh sách dữ liệu</h2>
+  <ul id="data-list"></ul>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
+    // Cấu hình Firebase của bạn
     const firebaseConfig = {
       apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
       authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -24,9 +28,11 @@
       measurementId: "G-FGGV4QX67R"
     };
 
+    // Khởi tạo
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    // Hàm lưu dữ liệu
     async function saveData() {
       const name = document.getElementById("name").value;
       const email = document.getElementById("email").value;
@@ -38,13 +44,32 @@
           createdAt: new Date()
         });
         alert("Ghi dữ liệu thành công!");
+        loadData(); // Tải lại danh sách sau khi ghi
       } catch (e) {
         console.error("Lỗi khi ghi dữ liệu: ", e);
       }
     }
 
+    // Hàm đọc dữ liệu
+    async function loadData() {
+      const listEl = document.getElementById("data-list");
+      listEl.innerHTML = ""; // Xóa dữ liệu cũ
+      const querySnapshot = await getDocs(collection(db, "users"));
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const li = document.createElement("li");
+        li.textContent = `${data.name} - ${data.email}`;
+        listEl.appendChild(li);
+      });
+    }
+
+    // Gắn hàm vào window để HTML gọi được
     window.saveData = saveData;
+
+    // Tải dữ liệu khi trang mở
+    loadData();
   </script>
 </body>
 </html>
+
 
