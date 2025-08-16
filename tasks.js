@@ -164,14 +164,16 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
+    // ✅ fix: remove old DOM nếu đã tồn tại
+    const old = document.getElementById(`task-${tid}`);
+    if (old) old.remove();
+
     const hasComment = t.comment && t.comment.trim() !== "";
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
     row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
     row.draggable = true;
-    row.dataset.id = tid;
-    row.dataset.group = t.groupId;
 
     row.innerHTML = `
         <span class="truncate">${t.title}</span>
@@ -186,35 +188,6 @@ function renderTask(docSnap) {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
-    });
-
-    row.querySelector(".edit-task").addEventListener("click", () => {
-        openModal("Sửa Task", [
-            { id: "title", placeholder: "Tên", value: t.title },
-            { id: "comment", placeholder: "Comment", type: "textarea", value: t.comment || "" }
-        ], async (vals) => {
-            await updateDoc(doc(db, "tasks", tid), {
-                title: vals.title, comment: vals.comment,
-                updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "Ẩn danh"
-            });
-        });
-    });
-
-    row.querySelector(".comment-task").addEventListener("click", () => {
-        openModal("Thêm/Sửa Comment", [
-            { id: "comment", placeholder: "Comment", type: "textarea", value: t.comment || "" }
-        ], async (vals) => {
-            await updateDoc(doc(db, "tasks", tid), {
-                comment: vals.comment, updatedAt: serverTimestamp(),
-                updatedBy: auth.currentUser?.email || "Ẩn danh"
-            });
-        });
-    });
-
-    row.querySelector(".delete-task").addEventListener("click", async () => {
-        if (confirm("Xóa task này?")) {
-            await deleteDoc(doc(db, "tasks", tid));
-        }
     });
 
     col.appendChild(row);
@@ -267,39 +240,31 @@ function setupGroupListeners(projectId) {
     document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
 
-// ===== Drag & Drop (fix) =====
-function renderTask(docSnap) {
-    const t = docSnap.data();
-    const tid = docSnap.id;
+// ===== Drag & Drop (fix triệt để) =====
+function setupDragDrop() {
+    ["inprogressCol", "doneCol"].forEach((colId) => {
+        const col = document.getElementById(colId);
+        if (!col) return;
 
-    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
-    const col = document.getElementById(colId);
-    if (!col) return;
+        col.addEventListener("dragover", (e) => e.preventDefault());
 
-    // ✅ FIX: nếu đã có task trong DOM thì remove trước
-    const old = document.getElementById(`task-${tid}`);
-    if (old) old.remove();
+        col.addEventListener("drop", async (e) => {
+            e.preventDefault();
 
-    const row = document.createElement("div");
-    row.id = `task-${tid}`;
-    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
-    row.draggable = true;
+            const type = e.dataTransfer.getData("type");
+            if (type !== "task") return;
 
-    row.innerHTML = `
-        <span class="truncate">${t.title}</span>
-        <div class="space-x-1">
-            <button class="edit-task">✏️</button>
-            <button class="comment-task ${t.comment ? 'text-blue-600 font-bold' : 'text-gray-400'}">💬</button>
-            <button class="delete-task">🗑️</button>
-        </div>
-    `;
+            const taskId = e.dataTransfer.getData("taskId");
+            if (!taskId) return;
 
-    row.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("type", "task");
-        e.dataTransfer.setData("taskId", tid);
-        e.dataTransfer.setData("groupId", t.groupId);
+            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+
+            // ✅ chỉ update task (không đụng group)
+            await updateDoc(doc(db, "tasks", taskId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+        });
     });
-
-    col.appendChild(row);
 }
-
