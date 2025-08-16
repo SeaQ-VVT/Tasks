@@ -1,157 +1,141 @@
-// Import Firebase
+// ===== Firebase SDKs =====
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  onSnapshot
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    where,
+    onSnapshot,
+    doc,
+    updateDoc,
+    deleteDoc,
+    serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-  authDomain: "task-manager-d18aa.firebaseapp.com",
-  projectId: "task-manager-d18aa",
-  storageBucket: "task-manager-d18aa.appspot.com",
-  messagingSenderId: "1080268498085",
-  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
-};
-
-// Init Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+const db = getFirestore();
+const auth = getAuth();
 
 let currentProjectId = null;
+const taskBoard = document.getElementById("taskBoard");
 
-// ==========================
-// Render Task Board
-// ==========================
-function renderTaskBoard(projectId) {
-  currentProjectId = projectId;
+// ===== Show task board =====
+export function showTaskBoard(projectId) {
+    currentProjectId = projectId;
 
-  const board = document.getElementById("taskBoard");
-  board.innerHTML = `
-    <h3 class="text-2xl font-bold mb-4">Task Board</h3>
-    <div class="grid grid-cols-3 gap-4">
-      <div class="task-col bg-gray-100 p-4 rounded-lg" data-status="todo">
-        <h4 class="font-semibold mb-2">To Do</h4>
-        <div class="task-list min-h-[200px]" id="todoList"></div>
-        <button id="addTaskBtn" class="mt-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded">+ Thêm task</button>
-      </div>
-      <div class="task-col bg-gray-100 p-4 rounded-lg" data-status="inprogress">
-        <h4 class="font-semibold mb-2">In Progress</h4>
-        <div class="task-list min-h-[200px]" id="inprogressList"></div>
-      </div>
-      <div class="task-col bg-gray-100 p-4 rounded-lg" data-status="done">
-        <h4 class="font-semibold mb-2">Done</h4>
-        <div class="task-list min-h-[200px]" id="doneList"></div>
-      </div>
-    </div>
-  `;
+    taskBoard.innerHTML = `
+        <div class="grid grid-cols-3 gap-4">
+            <!-- To Do -->
+            <div class="bg-white p-4 rounded shadow">
+                <h3 class="font-bold text-lg text-red-600 mb-2">To Do</h3>
+                <button id="addTodoBtn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">+ Thêm</button>
+                <div id="todoCol" class="space-y-2 mt-2"></div>
+            </div>
 
-  // Load tasks
-  listenTasks(projectId);
+            <!-- In Progress -->
+            <div class="bg-white p-4 rounded shadow">
+                <h3 class="font-bold text-lg text-yellow-600 mb-2">In Progress</h3>
+                <button id="addInProgressBtn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">+ Thêm</button>
+                <div id="inprogressCol" class="space-y-2 mt-2"></div>
+            </div>
 
-  // Add task
-  document.getElementById("addTaskBtn").addEventListener("click", async () => {
-    const title = prompt("Nhập tên task:");
+            <!-- Done -->
+            <div class="bg-white p-4 rounded shadow">
+                <h3 class="font-bold text-lg text-green-600 mb-2">Done</h3>
+                <button id="addDoneBtn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">+ Thêm</button>
+                <div id="doneCol" class="space-y-2 mt-2"></div>
+            </div>
+        </div>
+    `;
+
+    setupTaskListeners(projectId);
+    loadTasks(projectId);
+}
+
+// ===== Load tasks realtime =====
+function loadTasks(projectId) {
+    const tasksCol = collection(db, "tasks");
+    const q = query(tasksCol, where("projectId", "==", projectId));
+
+    onSnapshot(q, (snapshot) => {
+        document.getElementById("todoCol").innerHTML = "";
+        document.getElementById("inprogressCol").innerHTML = "";
+        document.getElementById("doneCol").innerHTML = "";
+
+        snapshot.forEach((docSnap) => {
+            renderTask(docSnap);
+        });
+    });
+}
+
+// ===== Render task card =====
+function renderTask(docSnap) {
+    const data = docSnap.data();
+    const id = docSnap.id;
+
+    const taskCard = document.createElement("div");
+    taskCard.className =
+        "bg-gray-100 p-3 rounded border shadow-sm text-sm";
+
+    taskCard.innerHTML = `
+        <p class="font-semibold">${data.title}</p>
+        <p class="text-gray-600 text-xs">Người tạo: ${data.createdBy || "-"}</p>
+        <p class="text-gray-500 text-xs">Trạng thái: ${data.status}</p>
+        <div class="flex space-x-2 mt-2">
+            <button data-id="${id}" class="edit-task bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded">Sửa</button>
+            <button data-id="${id}" class="delete-task bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">Xóa</button>
+        </div>
+    `;
+
+    document.getElementById(`${data.status}Col`).appendChild(taskCard);
+
+    // Event edit/delete
+    taskCard.querySelector(".edit-task").addEventListener("click", () => {
+        editTask(id, data);
+    });
+
+    taskCard.querySelector(".delete-task").addEventListener("click", () => {
+        deleteTask(id);
+    });
+}
+
+// ===== Add new task =====
+function setupTaskListeners(projectId) {
+    document.getElementById("addTodoBtn").addEventListener("click", () => addTask("todo", projectId));
+    document.getElementById("addInProgressBtn").addEventListener("click", () => addTask("inprogress", projectId));
+    document.getElementById("addDoneBtn").addEventListener("click", () => addTask("done", projectId));
+}
+
+async function addTask(status, projectId) {
+    const title = prompt("Nhập tên công việc:");
     if (!title) return;
 
     const user = auth.currentUser;
+
     await addDoc(collection(db, "tasks"), {
-      title,
-      status: "todo",
-      projectId: currentProjectId,
-      createdAt: new Date(),
-      createdBy: user ? user.email : "Ẩn danh"
+        title,
+        projectId,
+        status,
+        createdAt: serverTimestamp(),
+        createdBy: user ? user.email : "Ẩn danh"
     });
-  });
-
-  enableDragDrop();
 }
 
-// ==========================
-// Listen for tasks
-// ==========================
-function listenTasks(projectId) {
-  const q = query(collection(db, "tasks"), where("projectId", "==", projectId));
+// ===== Edit task =====
+async function editTask(id, oldData) {
+    const newTitle = prompt("Sửa tên công việc:", oldData.title);
+    if (!newTitle) return;
 
-  onSnapshot(q, (snapshot) => {
-    document.getElementById("todoList").innerHTML = "";
-    document.getElementById("inprogressList").innerHTML = "";
-    document.getElementById("doneList").innerHTML = "";
-
-    snapshot.forEach((docSnap) => {
-      const data = docSnap.data();
-      const taskEl = document.createElement("div");
-      taskEl.className = "bg-white p-2 rounded shadow mb-2 cursor-move";
-      taskEl.draggable = true;
-      taskEl.dataset.id = docSnap.id;
-      taskEl.dataset.status = data.status;
-
-      taskEl.innerHTML = `
-        <p class="font-medium">${data.title}</p>
-        <p class="text-xs text-gray-500">By: ${data.createdBy || "-"}</p>
-        <div class="flex space-x-2 mt-1">
-          <button class="editTask text-blue-500 text-sm">Sửa</button>
-          <button class="deleteTask text-red-500 text-sm">Xóa</button>
-        </div>
-      `;
-
-      document.getElementById(data.status + "List").appendChild(taskEl);
-
-      // Edit task
-      taskEl.querySelector(".editTask").addEventListener("click", async () => {
-        const newTitle = prompt("Tên mới:", data.title);
-        if (newTitle) {
-          await updateDoc(doc(db, "tasks", docSnap.id), { title: newTitle });
-        }
-      });
-
-      // Delete task
-      taskEl.querySelector(".deleteTask").addEventListener("click", async () => {
-        if (confirm("Xóa task này?")) {
-          await deleteDoc(doc(db, "tasks", docSnap.id));
-        }
-      });
+    await updateDoc(doc(db, "tasks", id), {
+        title: newTitle,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
     });
-  });
 }
 
-// ==========================
-// Drag & Drop
-// ==========================
-function enableDragDrop() {
-  document.querySelectorAll(".task-list").forEach(list => {
-    list.addEventListener("dragover", (e) => {
-      e.preventDefault();
-    });
-
-    list.addEventListener("drop", async (e) => {
-      e.preventDefault();
-      const taskId = e.dataTransfer.getData("text/plain");
-      const newStatus = list.id.replace("List", "");
-
-      await updateDoc(doc(db, "tasks", taskId), { status: newStatus });
-    });
-  });
-
-  document.addEventListener("dragstart", (e) => {
-    if (e.target.classList.contains("bg-white")) {
-      e.dataTransfer.setData("text/plain", e.target.dataset.id);
+// ===== Delete task =====
+async function deleteTask(id) {
+    if (confirm("Xóa công việc này?")) {
+        await deleteDoc(doc(db, "tasks", id));
     }
-  });
 }
-
-// ==========================
-// Export (để gọi từ ngoài)
-// ==========================
-export { renderTaskBoard };
