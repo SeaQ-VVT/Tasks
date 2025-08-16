@@ -36,23 +36,18 @@ export function showTaskBoard(projectId) {
 
     taskBoard.innerHTML = `
         <div class="grid grid-cols-3 gap-4 w-full">
-            <!-- To Do -->
-            <div class="bg-white p-4 rounded shadow min-h-[400px]" id="todoArea">
-                <h3 class="font-bold text-lg text-red-600 mb-2">To Do</h3>
-                <button id="addGroupBtn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm">+ Thêm Group</button>
-                <div id="groupContainer" class="space-y-4 mt-2 min-h-[100px]"></div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
+                <h3 class="font-bold text-red-600 mb-2">To Do</h3>
+                <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">+ Group</button>
+                <div id="groupContainer" class="space-y-3 mt-2"></div>
             </div>
-
-            <!-- In Progress -->
-            <div class="bg-white p-4 rounded shadow min-h-[400px]" id="inprogressArea">
-                <h3 class="font-bold text-lg text-yellow-600 mb-2">In Progress</h3>
-                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[100px]"></div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
+                <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
+                <div id="inprogressCol" class="space-y-2 mt-2"></div>
             </div>
-
-            <!-- Done -->
-            <div class="bg-white p-4 rounded shadow min-h-[400px]" id="doneArea">
-                <h3 class="font-bold text-lg text-green-600 mb-2">Done</h3>
-                <div id="doneCol" class="space-y-2 mt-2 min-h-[100px]"></div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+                <h3 class="font-bold text-green-600 mb-2">Done</h3>
+                <div id="doneCol" class="space-y-2 mt-2"></div>
             </div>
         </div>
     `;
@@ -70,51 +65,44 @@ function loadGroups(projectId) {
     onSnapshot(q, (snapshot) => {
         const groupContainer = document.getElementById("groupContainer");
         groupContainer.innerHTML = "";
-        snapshot.forEach((docSnap) => {
-            renderGroup(docSnap);
-        });
+        snapshot.forEach((docSnap) => renderGroup(docSnap));
     });
 }
 
 // ===== Render Group =====
 function renderGroup(docSnap) {
-    const groupData = docSnap.data();
-    const groupId = docSnap.id;
+    const g = docSnap.data();
+    const gid = docSnap.id;
 
-    const groupDiv = document.createElement("div");
-    groupDiv.className = "border rounded-lg p-3 bg-gray-50 shadow";
-    groupDiv.id = `group-${groupId}`;
-    groupDiv.draggable = true;
+    const div = document.createElement("div");
+    div.className = "border rounded p-2 bg-gray-50 shadow";
+    div.id = `group-${gid}`;
+    div.draggable = true;
 
-    groupDiv.innerHTML = `
-        <div class="flex justify-between items-center mb-2">
-            <h4 class="font-semibold text-blue-700">${groupData.title}</h4>
-            <div class="flex space-x-2">
-                <button data-id="${groupId}" class="edit-group bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
-                <button data-id="${groupId}" class="delete-group bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
+    div.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span class="font-semibold text-blue-700">${g.title}</span>
+            <div class="space-x-1">
+                <button class="edit-group text-yellow-600">✏️</button>
+                <button class="delete-group text-red-600">🗑️</button>
             </div>
         </div>
-        <button data-id="${groupId}" class="add-task bg-green-500 text-white px-2 py-1 rounded text-xs">+ Thêm Task</button>
-        <div id="tasks-${groupId}" class="space-y-2 mt-2 min-h-[50px]"></div>
-        <div id="logs-${groupId}" class="mt-3 text-xs text-gray-600 bg-white p-2 rounded border">
-            <p class="font-semibold">Lịch sử thao tác:</p>
-        </div>
+        <button class="add-task text-green-600 text-xs mt-1">+ Task</button>
+        <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
     `;
 
-    document.getElementById("groupContainer").appendChild(groupDiv);
+    document.getElementById("groupContainer").appendChild(div);
 
-    // drag group
-    groupDiv.addEventListener("dragstart", (e) => {
+    div.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "group");
-        e.dataTransfer.setData("groupId", groupId);
+        e.dataTransfer.setData("groupId", gid);
     });
 
-    loadTasks(groupId);
-    loadLogs(groupId);
+    loadTasks(gid);
 
-    groupDiv.querySelector(".add-task").addEventListener("click", () => addTask("todo", groupId, groupData.projectId));
-    groupDiv.querySelector(".edit-group").addEventListener("click", () => editGroup(groupId, groupData));
-    groupDiv.querySelector(".delete-group").addEventListener("click", () => deleteGroup(groupId, groupData));
+    div.querySelector(".add-task").addEventListener("click", () => addTask("todo", gid, g.projectId));
+    div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
+    div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
 // ===== Load tasks realtime =====
@@ -124,159 +112,102 @@ function loadTasks(groupId) {
 
     onSnapshot(q, (snapshot) => {
         const taskDiv = document.getElementById(`tasks-${groupId}`);
-        if (taskDiv) taskDiv.innerHTML = "";
+        if (!taskDiv) return;
+        taskDiv.innerHTML = "";
 
-        snapshot.forEach((docSnap) => {
-            renderTask(docSnap);
-        });
+        snapshot.forEach((docSnap) => renderTask(docSnap));
     });
 }
 
-// ===== Render task card =====
+// ===== Render task row =====
 function renderTask(docSnap) {
-    const data = docSnap.data();
-    const id = docSnap.id;
+    const t = docSnap.data();
+    const tid = docSnap.id;
 
-    let colId = data.status === "todo" ? `tasks-${data.groupId}` : `${data.status}Col`;
+    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    const col = document.getElementById(colId);
+    if (!col) return;
 
-    const taskCard = document.createElement("div");
-    taskCard.className = "bg-gray-100 p-3 rounded border shadow-sm text-sm cursor-move";
-    taskCard.draggable = true;
-    taskCard.dataset.id = id;
-    taskCard.dataset.group = data.groupId;
+    const row = document.createElement("div");
+    row.id = `task-${tid}`;
+    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
+    row.draggable = true;
+    row.dataset.id = tid;
+    row.dataset.group = t.groupId;
 
-    taskCard.innerHTML = `
-        <p class="font-semibold">${data.title}</p>
-        <p class="text-gray-600 text-xs">Người tạo: ${data.createdBy || "-"}</p>
-        <p class="text-gray-500 text-xs">Trạng thái: ${data.status}</p>
-        <p class="text-gray-500 text-xs">Ghi chú: ${data.comment || "-"}</p>
-        <div class="flex space-x-2 mt-2">
-            <button data-id="${id}" class="edit-task bg-yellow-500 hover:bg-yellow-600 text-white px-2 py-1 rounded">Sửa</button>
-            <button data-id="${id}" class="delete-task bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded">Xóa</button>
+    row.innerHTML = `
+        <span class="truncate">${t.title}</span>
+        <div class="space-x-1">
+            <button class="edit-task" title="Sửa">✏️</button>
+            <button class="comment-task" title="Comment">💬</button>
+            <button class="delete-task" title="Xóa">🗑️</button>
         </div>
     `;
 
-    taskCard.addEventListener("dragstart", (e) => {
+    row.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "task");
-        e.dataTransfer.setData("taskId", id);
-        e.dataTransfer.setData("groupId", data.groupId);
+        e.dataTransfer.setData("taskId", tid);
+        e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    const col = document.getElementById(colId);
-    if (col) col.appendChild(taskCard);
-
-    // Edit Task
-    taskCard.querySelector(".edit-task").addEventListener("click", async () => {
-        const newTitle = prompt("Sửa tên công việc:", data.title);
+    row.querySelector(".edit-task").addEventListener("click", async () => {
+        const newTitle = prompt("Tên mới:", t.title);
         if (!newTitle) return;
-        const newComment = prompt("Sửa comment:", data.comment || "");
-        await updateDoc(doc(db, "tasks", id), {
-            title: newTitle,
-            comment: newComment,
-            updatedAt: serverTimestamp(),
-            updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-        });
-        await addDoc(collection(db, "groups", data.groupId, "logs"), {
-            action: "update-task",
-            taskTitle: newTitle,
-            user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-            time: serverTimestamp()
-        });
+        await updateDoc(doc(db, "tasks", tid), { title: newTitle, updatedAt: serverTimestamp() });
     });
 
-    // Delete Task
-    taskCard.querySelector(".delete-task").addEventListener("click", async () => {
-        if (confirm("Xóa công việc này?")) {
-            await deleteDoc(doc(db, "tasks", id));
-            await addDoc(collection(db, "groups", data.groupId, "logs"), {
-                action: "delete-task",
-                taskTitle: data.title,
-                user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-                time: serverTimestamp()
-            });
-        }
+    row.querySelector(".comment-task").addEventListener("click", async () => {
+        const newComment = prompt("Comment:", t.comment || "");
+        await updateDoc(doc(db, "tasks", tid), { comment: newComment, updatedAt: serverTimestamp() });
     });
-}
 
-// ===== Load Logs realtime =====
-function loadLogs(groupId) {
-    const logsCol = collection(db, "groups", groupId, "logs");
-    onSnapshot(logsCol, (snapshot) => {
-        const logDiv = document.getElementById(`logs-${groupId}`);
-        if (!logDiv) return;
-        logDiv.innerHTML = `<p class="font-semibold">Lịch sử thao tác:</p>`;
-        snapshot.forEach((logSnap) => {
-            const log = logSnap.data();
-            const p = document.createElement("p");
-            p.textContent = `${log.action} - ${log.taskTitle || log.groupTitle || ""} bởi ${log.user}`;
-            logDiv.appendChild(p);
-        });
+    row.querySelector(".delete-task").addEventListener("click", async () => {
+        if (confirm("Xóa task này?")) await deleteDoc(doc(db, "tasks", tid));
     });
+
+    col.appendChild(row);
 }
 
 // ===== Group actions =====
 async function addGroup(projectId) {
-    const title = prompt("Nhập tên Group:");
+    const title = prompt("Tên Group:");
     if (!title) return;
-
     await addDoc(collection(db, "groups"), {
-        title,
-        projectId,
-        status: "todo",
+        title, projectId, status: "todo",
         createdAt: serverTimestamp(),
-        createdBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
+        createdBy: auth.currentUser?.email || "Ẩn danh"
     });
 }
 
-async function editGroup(groupId, groupData) {
-    const newTitle = prompt("Sửa tên Group:", groupData.title);
+async function editGroup(groupId, g) {
+    const newTitle = prompt("Tên mới:", g.title);
     if (!newTitle) return;
     await updateDoc(doc(db, "groups", groupId), {
-        title: newTitle,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-    });
-    await addDoc(collection(db, "groups", groupId, "logs"), {
-        action: "update-group",
-        oldTitle: groupData.title,
-        newTitle: newTitle,
-        user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-        time: serverTimestamp()
+        title: newTitle, updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.email || "Ẩn danh"
     });
 }
 
-async function deleteGroup(groupId, groupData) {
-    if (!confirm("Xóa group này và tất cả task bên trong?")) return;
+async function deleteGroup(groupId, g) {
+    if (!confirm("Xóa group này và task trong nó?")) return;
 
     const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
-    taskSnap.forEach(async (t) => {
-        await deleteDoc(doc(db, "tasks", t.id));
-    });
+    taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
 
     await deleteDoc(doc(db, "groups", groupId));
-
-    await addDoc(collection(db, "groups", groupId, "logs"), {
-        action: "delete-group",
-        groupTitle: groupData.title,
-        user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-        time: serverTimestamp()
-    });
 }
 
 // ===== Task actions =====
 async function addTask(status, groupId, projectId) {
-    const title = prompt("Nhập tên công việc:");
+    const title = prompt("Tên Task:");
     if (!title) return;
-    const comment = prompt("Nhập comment cho công việc (tuỳ chọn):");
-
     await addDoc(collection(db, "tasks"), {
         title,
-        comment: comment || "",
         projectId,
         groupId,
         status,
         createdAt: serverTimestamp(),
-        createdBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
+        createdBy: auth.currentUser?.email || "Ẩn danh"
     });
 }
 
@@ -285,7 +216,7 @@ function setupGroupListeners(projectId) {
     document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
 
-// ===== Drag & Drop setup =====
+// ===== Drag & Drop =====
 function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
@@ -293,22 +224,14 @@ function setupDragDrop() {
         col.addEventListener("drop", async (e) => {
             e.preventDefault();
             const type = e.dataTransfer.getData("type");
-
             let newStatus = colId === "inprogressCol" ? "inprogress" : "done";
 
             if (type === "task") {
                 const taskId = e.dataTransfer.getData("taskId");
-                const groupId = e.dataTransfer.getData("groupId");
                 await updateDoc(doc(db, "tasks", taskId), {
                     status: newStatus,
                     updatedAt: serverTimestamp(),
-                    updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-                });
-                await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-task",
-                    taskTitle: taskId,
-                    user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-                    time: serverTimestamp()
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
                 });
             }
 
@@ -316,23 +239,9 @@ function setupDragDrop() {
                 const groupId = e.dataTransfer.getData("groupId");
                 const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
                 taskSnap.forEach(async (t) => {
-                    await updateDoc(doc(db, "tasks", t.id), {
-                        status: newStatus,
-                        updatedAt: serverTimestamp(),
-                        updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-                    });
+                    await updateDoc(doc(db, "tasks", t.id), { status: newStatus, updatedAt: serverTimestamp() });
                 });
-                await updateDoc(doc(db, "groups", groupId), {
-                    status: newStatus,
-                    updatedAt: serverTimestamp(),
-                    updatedBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-                });
-                await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-group",
-                    groupTitle: groupId,
-                    user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-                    time: serverTimestamp()
-                });
+                await updateDoc(doc(db, "groups", groupId), { status: newStatus, updatedAt: serverTimestamp() });
             }
         });
     });
