@@ -1,7 +1,8 @@
 // ===== Firebase SDKs =====
 import {
-  getFirestore, collection, addDoc, query, onSnapshot,
-  doc, deleteDoc, updateDoc, orderBy, serverTimestamp, arrayUnion
+  getFirestore, collection, addDoc, doc,
+  updateDoc, deleteDoc, query, onSnapshot,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -16,169 +17,182 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
+// ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== Show Task Board =====
+// ===== Hiển thị Kanban =====
 window.showTaskBoard = function (projectId) {
-  document.getElementById("taskBoard").innerHTML = `
-    <div class="grid grid-cols-3 gap-4 mt-4">
-      <div id="todoCol" class="p-3 bg-gray-50 rounded shadow">
+  const taskBoard = document.getElementById("taskBoard");
+  taskBoard.innerHTML = `
+    <div class="grid grid-cols-3 gap-4">
+      <div id="todoCol" class="p-4 bg-gray-50 rounded-lg border">
         <h3 class="font-bold text-red-600 mb-2">To Do</h3>
-        <button id="addTodoBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-sm mb-2">+ Thêm</button>
+        <button id="addTodoBtn" class="bg-blue-500 text-white px-3 py-1 rounded text-sm mb-3">+ Thêm</button>
       </div>
-      <div id="inprogressCol" class="p-3 bg-gray-50 rounded shadow">
+      <div id="inprogressCol" class="p-4 bg-gray-50 rounded-lg border">
         <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
       </div>
-      <div id="doneCol" class="p-3 bg-gray-50 rounded shadow">
+      <div id="doneCol" class="p-4 bg-gray-50 rounded-lg border">
         <h3 class="font-bold text-green-600 mb-2">Done</h3>
       </div>
     </div>
   `;
 
-  // Load groups realtime
-  const groupsCol = collection(db, "projects", projectId, "groups");
-  const q = query(groupsCol, orderBy("createdAt", "desc"));
+  // === Realtime load groups ===
+  const q = query(collection(db, "projects", projectId, "groups"));
   onSnapshot(q, (snapshot) => {
     ["todoCol", "inprogressCol", "doneCol"].forEach(id => {
-      document.getElementById(id).querySelectorAll(".group-card").forEach(el => el.remove());
+      document.getElementById(id).querySelectorAll(".group-card").forEach(e => e.remove());
     });
 
-    snapshot.forEach(docSnap => renderGroup(docSnap, projectId));
+    snapshot.forEach((docSnap) => {
+      renderGroup(projectId, docSnap);
+    });
   });
 
-  // Add group
+  // === Thêm group mới vào ToDo ===
   document.getElementById("addTodoBtn").addEventListener("click", async () => {
     const title = prompt("Tên group:");
     if (!title) return;
-    await addDoc(groupsCol, {
+    await addDoc(collection(db, "projects", projectId, "groups"), {
       title,
       status: "todo",
-      projectId,
       createdAt: serverTimestamp(),
       createdBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
     });
   });
 };
 
-// ===== Render Group (card) =====
-function renderGroup(docSnap, projectId) {
+// ===== Render Group Card =====
+function renderGroup(projectId, docSnap) {
   const data = docSnap.data();
   const id = docSnap.id;
 
-  const groupDiv = document.createElement("div");
-  groupDiv.className = "group-card p-3 border rounded-md shadow mb-3 bg-white";
-  groupDiv.setAttribute("draggable", true);
-  groupDiv.dataset.id = id;
+  const card = document.createElement("div");
+  card.className = "group-card p-3 border rounded-md shadow mb-3 bg-white";
+  card.draggable = true;
+  card.dataset.id = id;
 
-  groupDiv.innerHTML = `
-    <h4 class="font-semibold">${data.title}</h4>
-    ${data.deadline ? `<p class="text-xs text-gray-500">Deadline: ${data.deadline.toDate().toLocaleDateString()}</p>` : ""}
+  card.innerHTML = `
+    <div class="flex justify-between items-center mb-2">
+      <h4 class="font-semibold">${data.title}</h4>
+      <div class="space-x-1">
+        <button class="edit-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
+        <button class="comment-btn bg-blue-500 text-white px-2 py-1 rounded text-xs">Cmt</button>
+        <button class="delete-btn bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
+      </div>
+    </div>
+    ${data.deadline ? `<p class="text-xs text-gray-500 mb-1">Deadline: ${data.deadline.toDate().toLocaleDateString()}</p>` : ""}
     <div>
       <p class="text-sm font-medium mb-1">Subtasks:</p>
       <div id="subtasks-${id}" class="space-y-1"></div>
-      <button data-id="${id}" class="add-subtask bg-blue-500 text-white px-2 py-1 rounded text-xs mt-2">+ Tệp</button>
+      <button data-id="${id}" class="add-subtask bg-green-500 text-white px-2 py-1 rounded text-xs mt-2">+ Subtask</button>
     </div>
   `;
 
-  document.getElementById(`${data.status}Col`).appendChild(groupDiv);
-  enableDragAndDrop(groupDiv, projectId, id);
+  document.getElementById(`${data.status}Col`).appendChild(card);
 
-  // Load subtasks realtime
+  // === Subtasks realtime ===
   const subtasksCol = collection(db, "projects", projectId, "groups", id, "subtasks");
   onSnapshot(subtasksCol, (snapshot) => {
     const container = document.getElementById(`subtasks-${id}`);
     container.innerHTML = "";
-    snapshot.forEach(stDoc => renderSubtask(stDoc, projectId, id, container));
+    snapshot.forEach(subDoc => {
+      const subData = subDoc.data();
+      const subId = subDoc.id;
+
+      const row = document.createElement("div");
+      row.className = "flex justify-between items-center bg-gray-100 p-1 rounded";
+      row.innerHTML = `
+        <label class="flex items-center space-x-2">
+          <input type="checkbox" ${subData.done ? "checked" : ""}/>
+          <span class="${subData.done ? 'line-through text-gray-400' : ''}">${subData.title}</span>
+        </label>
+        <div class="space-x-1">
+          <button class="edit-sub bg-yellow-400 text-xs px-1 rounded">✎</button>
+          <button class="del-sub bg-red-400 text-xs px-1 rounded">🗑</button>
+        </div>
+      `;
+
+      // Toggle done
+      row.querySelector("input").addEventListener("change", async (e) => {
+        await updateDoc(doc(db, "projects", projectId, "groups", id, "subtasks", subId), {
+          done: e.target.checked
+        });
+      });
+
+      // Edit subtask
+      row.querySelector(".edit-sub").addEventListener("click", async () => {
+        const newTitle = prompt("Sửa subtask:", subData.title);
+        if (!newTitle) return;
+        await updateDoc(doc(db, "projects", projectId, "groups", id, "subtasks", subId), {
+          title: newTitle
+        });
+      });
+
+      // Delete subtask
+      row.querySelector(".del-sub").addEventListener("click", async () => {
+        await deleteDoc(doc(db, "projects", projectId, "groups", id, "subtasks", subId));
+      });
+
+      container.appendChild(row);
+    });
   });
 
   // Add subtask
-  groupDiv.querySelector(".add-subtask").addEventListener("click", async () => {
-    const title = prompt("Tên subtask:");
-    if (!title) return;
+  card.querySelector(".add-subtask").addEventListener("click", async () => {
+    const sTitle = prompt("Tên subtask:");
+    if (!sTitle) return;
     await addDoc(collection(db, "projects", projectId, "groups", id, "subtasks"), {
-      title,
+      title: sTitle,
       done: false,
-      comments: [],
-      createdAt: serverTimestamp(),
-      createdBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh"
-    });
-  });
-}
-
-// ===== Render Subtask =====
-function renderSubtask(docSnap, projectId, groupId, container) {
-  const data = docSnap.data();
-  const subId = docSnap.id;
-
-  const div = document.createElement("div");
-  div.className = "flex justify-between items-center bg-gray-50 p-2 rounded";
-
-  div.innerHTML = `
-    <label class="flex items-center space-x-2 flex-1">
-      <input type="checkbox" ${data.done ? "checked" : ""}/>
-      <span class="${data.done ? 'line-through text-gray-400' : ''}">${data.title}</span>
-    </label>
-    <div class="space-x-1">
-      <button class="edit-sub bg-yellow-500 text-white px-2 py-1 text-xs rounded">Sửa</button>
-      <button class="del-sub bg-red-500 text-white px-2 py-1 text-xs rounded">Xóa</button>
-      <button class="comment-sub bg-green-500 text-white px-2 py-1 text-xs rounded">💬</button>
-    </div>
-  `;
-
-  // Toggle done
-  div.querySelector("input").addEventListener("change", async (e) => {
-    await updateDoc(doc(db, "projects", projectId, "groups", groupId, "subtasks", subId), {
-      done: e.target.checked
+      createdAt: serverTimestamp()
     });
   });
 
-  // Edit
-  div.querySelector(".edit-sub").addEventListener("click", async () => {
-    const newTitle = prompt("Tên mới:", data.title);
+  // Edit group
+  card.querySelector(".edit-btn").addEventListener("click", async () => {
+    const newTitle = prompt("Sửa group:", data.title);
     if (!newTitle) return;
-    await updateDoc(doc(db, "projects", projectId, "groups", groupId, "subtasks", subId), {
+    await updateDoc(doc(db, "projects", projectId, "groups", id), {
       title: newTitle
     });
   });
 
-  // Delete
-  div.querySelector(".del-sub").addEventListener("click", async () => {
-    if (confirm("Xóa subtask này?")) {
-      await deleteDoc(doc(db, "projects", projectId, "groups", groupId, "subtasks", subId));
+  // Delete group
+  card.querySelector(".delete-btn").addEventListener("click", async () => {
+    if (confirm("Xóa group này?")) {
+      await deleteDoc(doc(db, "projects", projectId, "groups", id));
     }
   });
 
-  // Comment
-  div.querySelector(".comment-sub").addEventListener("click", async () => {
-    const cmt = prompt("Nhập comment:");
-    if (!cmt) return;
-    await updateDoc(doc(db, "projects", projectId, "groups", groupId, "subtasks", subId), {
-      comments: arrayUnion({
-        user: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
-        text: cmt,
-        createdAt: new Date()
-      })
+  // Comment group
+  card.querySelector(".comment-btn").addEventListener("click", async () => {
+    const text = prompt("Nhập comment:");
+    if (!text) return;
+    await addDoc(collection(db, "projects", projectId, "groups", id, "comments"), {
+      text,
+      createdBy: auth.currentUser ? auth.currentUser.email : "Ẩn danh",
+      createdAt: serverTimestamp()
     });
+    alert("Đã lưu comment!");
   });
 
-  container.appendChild(div);
-}
-
-// ===== Drag & Drop =====
-function enableDragAndDrop(groupDiv, projectId, groupId) {
-  groupDiv.addEventListener("dragstart", (e) => {
-    e.dataTransfer.setData("groupId", groupId);
+  // Drag & Drop
+  card.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("groupId", id);
   });
-
   ["todoCol", "inprogressCol", "doneCol"].forEach(colId => {
     const col = document.getElementById(colId);
-    col.addEventListener("dragover", (e) => e.preventDefault());
-    col.addEventListener("drop", async () => {
-      const id = e.dataTransfer.getData("groupId");
-      const newStatus = colId.replace("Col", "");
-      await updateDoc(doc(db, "projects", projectId, "groups", id), { status: newStatus });
-    });
+    col.ondragover = (e) => e.preventDefault();
+    col.ondrop = async (e) => {
+      const gId = e.dataTransfer.getData("groupId");
+      let newStatus = colId.replace("Col", "");
+      await updateDoc(doc(db, "projects", projectId, "groups", gId), {
+        status: newStatus
+      });
+    };
   });
 }
