@@ -83,10 +83,12 @@ function renderProject(doc) {
         <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
         <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${data.createdBy || "Không rõ"}</p>
         <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
-        <div class="flex space-x-2">
-            <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">Sửa</button>
-            <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">Xóa</button>
-        </div>
+ <div class="flex space-x-2 mt-2">
+    <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">Xem công việc</button>
+    <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">Sửa</button>
+    <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">Xóa</button>
+</div>
+        
     `;
 
     projectArea.appendChild(projectCard);
@@ -120,9 +122,17 @@ function setupProjectListener() {
                 showDeleteConfirmation(id);
             });
         });
+
+        // 👉 THÊM ĐOẠN NÀY Ở ĐÂY
+        document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                const id = e.target.dataset.id;
+                console.log("Xem công việc cho project:", id);
+                showTaskBoard(id); // gọi hàm viết trong file taskboard.js
+            });
+        });
     });
 }
-
 // ===== Add / Update project =====
 saveProjectBtn.addEventListener("click", async () => {
     const title = projectTitleInput.value.trim();
@@ -229,3 +239,4 @@ auth.onAuthStateChanged((user) => {
         addProjectBtn.classList.add("hidden");
     }
 });
+
