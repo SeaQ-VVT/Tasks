@@ -34,8 +34,9 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Lắng nghe trạng thái đăng nhập
 const projectId = "project123";
+
+// Lắng nghe trạng thái đăng nhập
 onAuthStateChanged(auth, (user) => {
     if (user) {
         showTaskBoard(projectId);
@@ -123,7 +124,7 @@ export function showTaskBoard(projectId) {
     taskBoard.innerHTML = `
         <div class="w-full bg-gray-100 p-4 rounded shadow mb-4">
             <h3 class="font-bold text-lg mb-2">Lịch sử hoạt động của dự án</h3>
-            <div id="projectLog" class="max-h-64 overflow-y-auto space-y-1"></div>
+            <div id="projectLog" class="max-h-64 overflow-y-auto space-y-1 text-sm"></div>
         </div>
         <div class="grid grid-cols-3 gap-4 w-full">
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
