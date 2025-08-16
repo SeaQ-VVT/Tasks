@@ -164,12 +164,12 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // xoá bản cũ nếu có
+    // Xóa cũ
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
-    // ✅ điều kiện fix: comment phải khác null + khác rỗng
-    const hasComment = (t.comment && t.comment.trim().length > 0);
+    // ✅ Check comment từ Firestore
+    const hasComment = (t.comment && String(t.comment).trim().length > 0);
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
@@ -185,19 +185,25 @@ function renderTask(docSnap) {
         </div>
     `;
 
+    // drag
     row.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    // ====== click để mở popup comment
+    // click mở popup comment
     row.querySelector(".comment-task").addEventListener("click", () => {
         openModal("Comment Task", [
-            { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+            { 
+                id: "comment", 
+                placeholder: "Nhập comment", 
+                type: "textarea", 
+                value: t.comment || "" 
+            }
         ], async (vals) => {
             await updateDoc(doc(db, "tasks", tid), {
-                comment: vals.comment,
+                comment: vals.comment || "",
                 updatedAt: serverTimestamp(),
                 updatedBy: auth.currentUser?.email || "Ẩn danh"
             });
@@ -206,7 +212,6 @@ function renderTask(docSnap) {
 
     col.appendChild(row);
 }
-
 
 // ===== Group actions =====
 async function addGroup(projectId) {
@@ -283,5 +288,6 @@ function setupDragDrop() {
         });
     });
 }
+
 
 
