@@ -164,12 +164,11 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // Xóa cũ
+    // ✅ fix: remove old DOM nếu đã tồn tại
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
-    // ✅ Check comment từ Firestore
-    const hasComment = (t.comment && String(t.comment).trim().length > 0);
+    const hasComment = t.comment && t.comment.trim() !== "";
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
@@ -185,29 +184,10 @@ function renderTask(docSnap) {
         </div>
     `;
 
-    // drag
     row.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
-    });
-
-    // click mở popup comment
-    row.querySelector(".comment-task").addEventListener("click", () => {
-        openModal("Comment Task", [
-            { 
-                id: "comment", 
-                placeholder: "Nhập comment", 
-                type: "textarea", 
-                value: t.comment || "" 
-            }
-        ], async (vals) => {
-            await updateDoc(doc(db, "tasks", tid), {
-                comment: vals.comment || "",
-                updatedAt: serverTimestamp(),
-                updatedBy: auth.currentUser?.email || "Ẩn danh"
-            });
-        });
     });
 
     col.appendChild(row);
@@ -288,6 +268,3 @@ function setupDragDrop() {
         });
     });
 }
-
-
-
