@@ -216,7 +216,7 @@ async function addGroup(projectId){
     await addDoc(collection(db,"groups"),{
         title,projectId,status:"todo",createdAt:serverTimestamp(),
         createdBy:auth.currentUser?auth.currentUser.email:"Ẩn danh",
-        logs:[]
+        logs: []   // ❗ bắt buộc có để arrayUnion hoạt động
     });
 }
 
