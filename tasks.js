@@ -32,7 +32,6 @@ const auth = getAuth(app);
 
 // ===== Modal helper =====
 function openModal(title, fields, onSave) {
-    // Create modal container
     let modal = document.getElementById("popupModal");
     if (!modal) {
         modal = document.createElement("div");
@@ -51,7 +50,6 @@ function openModal(title, fields, onSave) {
         document.body.appendChild(modal);
     }
 
-    // Setup content
     document.getElementById("modalTitle").textContent = title;
     const fieldsDiv = document.getElementById("modalFields");
     fieldsDiv.innerHTML = "";
@@ -63,10 +61,8 @@ function openModal(title, fields, onSave) {
         }
     });
 
-    // Show modal
     modal.classList.remove("hidden");
 
-    // Buttons
     document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
     document.getElementById("modalSave").onclick = () => {
         const values = {};
@@ -89,11 +85,11 @@ export function showTaskBoard(projectId) {
             </div>
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
                 <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
-                <div id="inprogressCol" class="space-y-2 mt-2"></div>
+                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[200px]"></div>
             </div>
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
                 <h3 class="font-bold text-green-600 mb-2">Done</h3>
-                <div id="doneCol" class="space-y-2 mt-2"></div>
+                <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
             </div>
         </div>
     `;
@@ -123,7 +119,6 @@ function renderGroup(docSnap) {
     const div = document.createElement("div");
     div.className = "border rounded p-2 bg-gray-50 shadow";
     div.id = `group-${gid}`;
-    div.draggable = true;
 
     div.innerHTML = `
         <div class="flex justify-between items-center">
@@ -135,18 +130,11 @@ function renderGroup(docSnap) {
         </div>
         <button class="add-task text-green-600 text-xs mt-1">+ Task</button>
         <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
-        <div id="logs-${gid}" class="text-xs text-gray-500 mt-2"></div>
     `;
 
     document.getElementById("groupContainer").appendChild(div);
 
-    div.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("type", "group");
-        e.dataTransfer.setData("groupId", gid);
-    });
-
     loadTasks(gid);
-    loadLogs(gid);
 
     div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
     div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
@@ -209,10 +197,6 @@ function renderTask(docSnap) {
                 title: vals.title, comment: vals.comment,
                 updatedAt: serverTimestamp(), updatedBy: auth.currentUser?.email || "Ẩn danh"
             });
-            await addDoc(collection(db, "groups", t.groupId, "logs"), {
-                action: "edit-task", taskTitle: vals.title,
-                user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
-            });
         });
     });
 
@@ -224,40 +208,16 @@ function renderTask(docSnap) {
                 comment: vals.comment, updatedAt: serverTimestamp(),
                 updatedBy: auth.currentUser?.email || "Ẩn danh"
             });
-            await addDoc(collection(db, "groups", t.groupId, "logs"), {
-                action: "comment-task", taskTitle: t.title,
-                user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
-            });
         });
     });
 
     row.querySelector(".delete-task").addEventListener("click", async () => {
         if (confirm("Xóa task này?")) {
             await deleteDoc(doc(db, "tasks", tid));
-            await addDoc(collection(db, "groups", t.groupId, "logs"), {
-                action: "delete-task", taskTitle: t.title,
-                user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
-            });
         }
     });
 
     col.appendChild(row);
-}
-
-// ===== Logs =====
-function loadLogs(groupId) {
-    const logsCol = collection(db, "groups", groupId, "logs");
-    onSnapshot(logsCol, (snapshot) => {
-        const logDiv = document.getElementById(`logs-${groupId}`);
-        if (!logDiv) return;
-        logDiv.innerHTML = "";
-        snapshot.forEach((logSnap) => {
-            const log = logSnap.data();
-            const p = document.createElement("p");
-            p.textContent = `${log.action} - ${log.taskTitle || log.groupTitle || ""} bởi ${log.user}`;
-            logDiv.appendChild(p);
-        });
-    });
 }
 
 // ===== Group actions =====
@@ -276,10 +236,6 @@ async function editGroup(groupId, g) {
             title: vals.title, updatedAt: serverTimestamp(),
             updatedBy: auth.currentUser?.email || "Ẩn danh"
         });
-        await addDoc(collection(db, "groups", groupId, "logs"), {
-            action: "edit-group", oldTitle: g.title, newTitle: vals.title,
-            user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
-        });
     });
 }
 
@@ -288,11 +244,6 @@ async function deleteGroup(groupId, g) {
 
     const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
     taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
-
-    await addDoc(collection(db, "groups", groupId, "logs"), {
-        action: "delete-group", groupTitle: g.title,
-        user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
-    });
 
     await deleteDoc(doc(db, "groups", groupId));
 }
@@ -316,7 +267,7 @@ function setupGroupListeners(projectId) {
     document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
 
-// ===== Drag & Drop =====
+// ===== Drag & Drop (fix) =====
 function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
@@ -326,57 +277,21 @@ function setupDragDrop() {
 
         col.addEventListener("drop", async (e) => {
             e.preventDefault();
+
             const type = e.dataTransfer.getData("type");
-            let newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+            if (type !== "task") return;
 
-            if (type === "task") {
-                const taskId = e.dataTransfer.getData("taskId");
-                const groupId = e.dataTransfer.getData("groupId");
+            const taskId = e.dataTransfer.getData("taskId");
+            const groupId = e.dataTransfer.getData("groupId");
+            if (!taskId || !groupId) return;
 
-                await updateDoc(doc(db, "tasks", taskId), {
-                    status: newStatus,
-                    updatedAt: serverTimestamp(),
-                    updatedBy: auth.currentUser?.email || "Ẩn danh"
-                });
+            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
 
-                await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-task",
-                    taskTitle: taskId, // có thể fetch title nếu muốn
-                    user: auth.currentUser?.email || "Ẩn danh",
-                    time: serverTimestamp()
-                });
-            }
-
-            if (type === "group") {
-                const groupId = e.dataTransfer.getData("groupId");
-
-                const taskSnap = await getDocs(query(
-                    collection(db, "tasks"),
-                    where("groupId", "==", groupId)
-                ));
-
-                taskSnap.forEach(async (t) => {
-                    await updateDoc(doc(db, "tasks", t.id), {
-                        status: newStatus,
-                        updatedAt: serverTimestamp(),
-                        updatedBy: auth.currentUser?.email || "Ẩn danh"
-                    });
-                });
-
-                await updateDoc(doc(db, "groups", groupId), {
-                    status: newStatus,
-                    updatedAt: serverTimestamp(),
-                    updatedBy: auth.currentUser?.email || "Ẩn danh"
-                });
-
-                await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-group",
-                    groupTitle: groupId,
-                    user: auth.currentUser?.email || "Ẩn danh",
-                    time: serverTimestamp()
-                });
-            }
+            await updateDoc(doc(db, "tasks", taskId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
         });
     });
 }
-
