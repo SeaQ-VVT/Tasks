@@ -1,10 +1,18 @@
-// tasks.js
+// ===== Firebase SDKs =====
 import {
-    getFirestore, collection, addDoc, query, onSnapshot, doc, deleteDoc, updateDoc, orderBy
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    onSnapshot,
+    doc,
+    deleteDoc,
+    orderBy
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
+// ===== Firebase Config =====
 const firebaseConfig = {
   apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
   authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -14,15 +22,14 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
+// ===== Init =====
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// Lấy chỗ hiển thị taskBoard
-const taskBoard = document.getElementById("taskBoard");
-
 // ===== Hàm showTaskBoard =====
-window.showTaskBoard = function (projectId) {
+export function showTaskBoard(projectId) {
+    const taskBoard = document.getElementById("taskBoard");
     taskBoard.innerHTML = ""; // Clear cũ
 
     const colRef = collection(db, "projects", projectId, "tasks");
@@ -31,7 +38,10 @@ window.showTaskBoard = function (projectId) {
     onSnapshot(q, (snapshot) => {
         taskBoard.innerHTML = `
             <h3 class="text-lg font-semibold mb-2">Danh sách công việc</h3>
-            <button id="addTaskBtn" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm mb-3">Thêm công việc</button>
+            <button id="addTaskBtn" 
+              class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm mb-3">
+              Thêm công việc
+            </button>
             <div id="taskList"></div>
         `;
 
@@ -46,13 +56,16 @@ window.showTaskBoard = function (projectId) {
                     <p class="text-sm text-gray-500">${data.status || "Chưa làm"}</p>
                 </div>
                 <div class="space-x-2">
-                    <button data-id="${docSnap.id}" class="delete-task-btn bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">Xóa</button>
+                    <button data-id="${docSnap.id}" 
+                      class="delete-task-btn bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">
+                      Xóa
+                    </button>
                 </div>
             `;
             taskList.appendChild(div);
         });
 
-        // Thêm sự kiện thêm Task
+        // Thêm task
         document.getElementById("addTaskBtn").onclick = async () => {
             const title = prompt("Nhập tên công việc:");
             if (!title) return;
@@ -64,7 +77,7 @@ window.showTaskBoard = function (projectId) {
             });
         };
 
-        // Xóa Task
+        // Xóa task
         document.querySelectorAll(".delete-task-btn").forEach((btn) => {
             btn.addEventListener("click", async (e) => {
                 const id = e.target.dataset.id;
@@ -72,4 +85,4 @@ window.showTaskBoard = function (projectId) {
             });
         });
     });
-};
+}
