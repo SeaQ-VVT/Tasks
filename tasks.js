@@ -5,12 +5,10 @@ import {
 
 import { 
     getFirestore, collection, doc, addDoc, getDocs, onSnapshot,
-    updateDoc, deleteDoc, query, where, serverTimestamp 
+    updateDoc, deleteDoc, query, where, serverTimestamp, arrayUnion
 } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
 
-import { 
-    getAuth 
-} from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-auth.js";
 
 
 // ===== Firebase Config =====
@@ -38,10 +36,7 @@ export function showTaskBoard(projectId) {
             <!-- To Do -->
             <div class="bg-white p-4 rounded shadow" id="todoArea">
                 <h3 class="font-bold text-lg text-red-600 mb-2">To Do</h3>
-                <button id="addGroupBtn" 
-                        class="bg-blue-500 text-white px-3 py-1 rounded text-sm mb-2">
-                        + Thêm Group
-                </button>
+                <button id="addGroupBtn" class="px-2">➕</button>
                 <div id="groupContainer" class="space-y-4 min-h-[200px]"></div>
             </div>
 
@@ -69,7 +64,7 @@ export function showTaskBoard(projectId) {
     // Add group
     document.getElementById("addGroupBtn").addEventListener("click",()=>addGroup(projectId));
 
-    // Realtime render groups
+    // Realtime groups
     const groupQ = query(collection(db,"groups"),where("projectId","==",projectId));
     onSnapshot(groupQ,(snap)=>{
         const groupContainer = document.getElementById("groupContainer");
@@ -79,7 +74,7 @@ export function showTaskBoard(projectId) {
         });
     });
 
-    // Realtime render tasks
+    // Realtime tasks
     const taskQ = query(collection(db,"tasks"),where("projectId","==",projectId));
     onSnapshot(taskQ,(snap)=>{
         document.getElementById("inprogressCol").innerHTML = "";
@@ -119,7 +114,12 @@ async function handleDrop(e,projectId,newStatus){
         await updateDoc(doc(db,"groups",groupId),{
             status:newStatus.replace("Area",""),
             updatedAt:serverTimestamp(),
-            updatedBy:auth.currentUser?auth.currentUser.email:"Ẩn danh"
+            updatedBy:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+            logs: arrayUnion({
+                action:"move-group",
+                user:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+                time:Date.now()
+            })
         });
     }
 }
@@ -139,26 +139,25 @@ function renderGroup(groupId,groupData){
         <div class="flex justify-between items-center mb-2">
             <h4 class="font-semibold text-blue-700">${groupData.title}</h4>
             <div class="flex space-x-2">
-                <button data-id="${groupId}" class="edit-group bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
-                <button data-id="${groupId}" class="delete-group bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
+                <button data-id="${groupId}" class="edit-group">✏️</button>
+                <button data-id="${groupId}" class="delete-group">❌</button>
             </div>
         </div>
-        <button data-id="${groupId}" class="add-task bg-green-500 text-white px-2 py-1 rounded text-xs mb-2">+ Thêm Task</button>
+        <button data-id="${groupId}" class="add-task mb-2">➕</button>
         <div id="tasks-${groupId}" class="space-y-2"></div>
-        <button class="toggle-log bg-gray-400 text-white px-2 py-1 rounded text-xs mt-2" data-id="${groupId}">📜 Nhật ký</button>
-        <div id="logBox-${groupId}" class="hidden bg-gray-50 p-2 rounded text-xs mt-2">
-            <strong>Lịch sử thao tác:</strong>
-            <div id="log-${groupId}"></div>
-        </div>
+        <button class="toggle-log mt-2" data-id="${groupId}">📜</button>
+        <div id="logBox-${groupId}" class="hidden bg-gray-50 p-2 rounded text-xs mt-2"></div>
     `;
 
-    // Event cho log toggle
+    // toggle log
     groupDiv.querySelector(".toggle-log").addEventListener("click",()=>{
         const logBox=groupDiv.querySelector(`#logBox-${groupId}`);
         logBox.classList.toggle("hidden");
+        if(!logBox.classList.contains("hidden")){
+            renderLogs(groupId,groupData.logs||[],logBox);
+        }
     });
 
-    // Event sửa / xóa / thêm task
     groupDiv.querySelector(".edit-group").addEventListener("click",()=>editGroup(groupId,groupData));
     groupDiv.querySelector(".delete-group").addEventListener("click",()=>deleteGroup(groupId,groupData));
     groupDiv.querySelector(".add-task").addEventListener("click",()=>addTask(groupId,groupData.projectId));
@@ -172,28 +171,7 @@ function renderTask(taskId,taskData){
     if(taskData.status==="todo"){
         const container=document.getElementById(`tasks-${taskData.groupId}`);
         if(container){
-            const taskDiv=document.createElement("div");
-            taskDiv.className="bg-white p-2 rounded shadow";
-            taskDiv.draggable=true;
-            taskDiv.addEventListener("dragstart",(e)=>{
-                e.dataTransfer.setData("type","task");
-                e.dataTransfer.setData("taskId",taskId);
-            });
-
-            taskDiv.innerHTML=`
-                <div><strong>${taskData.title}</strong></div>
-                <div class="text-xs text-gray-600">Người tạo: ${taskData.createdBy||"-"}</div>
-                <div class="text-xs text-gray-600">Trạng thái: ${taskData.status}</div>
-                <div class="flex space-x-2 mt-1">
-                    <button data-id="${taskId}" class="edit-task bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
-                    <button data-id="${taskId}" class="delete-task bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
-                </div>
-            `;
-
-            taskDiv.querySelector(".edit-task").addEventListener("click",()=>editTask(taskId,taskData));
-            taskDiv.querySelector(".delete-task").addEventListener("click",()=>deleteTask(taskId,taskData));
-
-            container.appendChild(taskDiv);
+            container.appendChild(makeTaskBox(taskId,taskData));
         }
     } else if(taskData.status==="inprogress"){
         document.getElementById("inprogressCol").appendChild(makeTaskBox(taskId,taskData));
@@ -201,7 +179,6 @@ function renderTask(taskId,taskData){
         document.getElementById("doneCol").appendChild(makeTaskBox(taskId,taskData));
     }
 }
-
 
 function makeTaskBox(taskId,taskData){
     const div=document.createElement("div");
@@ -213,16 +190,22 @@ function makeTaskBox(taskId,taskData){
     });
     div.innerHTML=`
         <div><strong>${taskData.title}</strong></div>
-        <div class="text-xs text-gray-600">Người tạo: ${taskData.createdBy||"-"}</div>
-        <div class="text-xs text-gray-600">Trạng thái: ${taskData.status}</div>
         <div class="flex space-x-2 mt-1">
-            <button data-id="${taskId}" class="edit-task bg-yellow-500 text-white px-2 py-1 rounded text-xs">Sửa</button>
-            <button data-id="${taskId}" class="delete-task bg-red-500 text-white px-2 py-1 rounded text-xs">Xóa</button>
+            <button data-id="${taskId}" class="edit-task">✏️</button>
+            <button data-id="${taskId}" class="delete-task">❌</button>
         </div>
     `;
     div.querySelector(".edit-task").addEventListener("click",()=>editTask(taskId,taskData));
     div.querySelector(".delete-task").addEventListener("click",()=>deleteTask(taskId,taskData));
     return div;
+}
+
+
+// ===== Render Logs =====
+function renderLogs(groupId,logs,logBox){
+    logBox.innerHTML = logs.map(l=>`
+        <div>- ${l.user} ${l.action} (${new Date(l.time).toLocaleString()})</div>
+    `).join("");
 }
 
 
@@ -232,7 +215,8 @@ async function addGroup(projectId){
     if(!title) return;
     await addDoc(collection(db,"groups"),{
         title,projectId,status:"todo",createdAt:serverTimestamp(),
-        createdBy:auth.currentUser?auth.currentUser.email:"Ẩn danh"
+        createdBy:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+        logs:[]
     });
 }
 
@@ -241,7 +225,12 @@ async function editGroup(groupId,groupData){
     if(!title) return;
     await updateDoc(doc(db,"groups",groupId),{
         title,updatedAt:serverTimestamp(),
-        updatedBy:auth.currentUser?auth.currentUser.email:"Ẩn danh"
+        updatedBy:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+        logs: arrayUnion({
+            action:"edit-group",
+            user:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+            time:Date.now()
+        })
     });
 }
 
@@ -262,6 +251,13 @@ async function addTask(groupId,projectId){
         title,groupId,projectId,status:"todo",createdAt:serverTimestamp(),
         createdBy:auth.currentUser?auth.currentUser.email:"Ẩn danh"
     });
+    await updateDoc(doc(db,"groups",groupId),{
+        logs: arrayUnion({
+            action:"add-task",
+            user:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+            time:Date.now()
+        })
+    });
 }
 
 async function editTask(taskId,taskData){
@@ -271,9 +267,23 @@ async function editTask(taskId,taskData){
         title,updatedAt:serverTimestamp(),
         updatedBy:auth.currentUser?auth.currentUser.email:"Ẩn danh"
     });
+    await updateDoc(doc(db,"groups",taskData.groupId),{
+        logs: arrayUnion({
+            action:"edit-task",
+            user:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+            time:Date.now()
+        })
+    });
 }
 
 async function deleteTask(taskId,taskData){
     if(!confirm("Xóa task này?")) return;
     await deleteDoc(doc(db,"tasks",taskId));
+    await updateDoc(doc(db,"groups",taskData.groupId),{
+        logs: arrayUnion({
+            action:"delete-task",
+            user:auth.currentUser?auth.currentUser.email:"Ẩn danh",
+            time:Date.now()
+        })
+    });
 }
