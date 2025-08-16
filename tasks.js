@@ -141,18 +141,27 @@ function renderGroup(docSnap) {
     div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
-// ===== Load tasks realtime =====
+// ===== Load tasks realtime (cải tiến) =====
 function loadTasks(groupId) {
-    const tasksCol = collection(db, "tasks");
-    const q = query(tasksCol, where("groupId", "==", groupId));
+    const tasksCol = collection(db, "tasks");
+    const q = query(tasksCol, where("groupId", "==", groupId));
 
-    onSnapshot(q, (snapshot) => {
-        const taskDiv = document.getElementById(`tasks-${groupId}`);
-        if (!taskDiv) return;
-        taskDiv.innerHTML = "";
+    onSnapshot(q, (snapshot) => {
+        // Duyệt qua các thay đổi
+        snapshot.docChanges().forEach((change) => {
+            const tid = change.doc.id;
+            const oldElement = document.getElementById(`task-${tid}`);
 
-        snapshot.forEach((docSnap) => renderTask(docSnap));
-    });
+            if (change.type === "added" || change.type === "modified") {
+                // Thêm hoặc cập nhật task
+                if (oldElement) oldElement.remove();
+                renderTask(change.doc);
+            } else if (change.type === "removed") {
+                // Xóa task khỏi giao diện
+                if (oldElement) oldElement.remove();
+            }
+        });
+    });
 }
 
 // ===== Render task row =====
@@ -312,3 +321,4 @@ function setupDragDrop() {
     });
 
 }
+
