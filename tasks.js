@@ -318,7 +318,7 @@ function setupGroupListeners(projectId) {
 
 // ===== Drag & Drop =====
 function setupDragDrop() {
-    ["todoArea", "inprogressCol", "doneCol"].forEach((colId) => {
+    ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
         if (!col) return;
 
@@ -327,8 +327,7 @@ function setupDragDrop() {
         col.addEventListener("drop", async (e) => {
             e.preventDefault();
             const type = e.dataTransfer.getData("type");
-            let newStatus = colId === "inprogressCol" ? "inprogress" :
-                            colId === "doneCol" ? "done" : "todo";
+            let newStatus = colId === "inprogressCol" ? "inprogress" : "done";
 
             if (type === "task") {
                 const taskId = e.dataTransfer.getData("taskId");
@@ -342,7 +341,7 @@ function setupDragDrop() {
 
                 await addDoc(collection(db, "groups", groupId, "logs"), {
                     action: "move-task",
-                    taskTitle: taskId, // nếu muốn đẹp hơn thì fetch title
+                    taskTitle: taskId, // có thể fetch title nếu muốn
                     user: auth.currentUser?.email || "Ẩn danh",
                     time: serverTimestamp()
                 });
