@@ -123,8 +123,11 @@ export function showTaskBoard(projectId) {
 
     taskBoard.innerHTML = `
         <div class="w-full bg-gray-100 p-4 rounded shadow mb-4">
-            <h3 class="font-bold text-lg mb-2">Lịch sử hoạt động của dự án</h3>
-            <div id="projectLog" class="max-h-64 overflow-y-auto space-y-1 text-sm"></div>
+            <div class="flex justify-between items-center">
+                <h3 class="font-bold text-lg">Lịch sử hoạt động của dự án</h3>
+                <button id="refreshLogsBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">Làm mới</button>
+            </div>
+            <div id="projectLog" class="max-h-64 overflow-y-auto space-y-1 text-sm mt-2"></div>
         </div>
         <div class="grid grid-cols-3 gap-4 w-full">
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
@@ -147,6 +150,7 @@ export function showTaskBoard(projectId) {
     setupGroupListeners(projectId);
     setupDragDrop(projectId);
     setupLogDisplay(projectId);
+    setupLogRefresh(projectId);
 }
 
 // ===== Load Groups realtime =====
@@ -359,33 +363,60 @@ function setupDragDrop(projectId) {
 }
 
 // ===== Hiển thị Log =====
-function setupLogDisplay(projectId) {
+function renderLogs(logs) {
     const logContainer = document.getElementById("projectLog");
-    if (!logContainer) {
-        console.error("Không tìm thấy phần tử 'projectLog'.");
-        return;
-    }
+    if (!logContainer) return;
 
+    logContainer.innerHTML = "";
+    logs.forEach((log) => {
+        const logItem = document.createElement("p");
+        logItem.className = "text-gray-600 my-1";
+        const formattedTime = log.timestamp ? new Date(log.timestamp.toDate()).toLocaleTimeString() : '...';
+        logItem.innerHTML = `<span class="font-semibold text-blue-700">${log.actor}</span>: ${log.description} <span class="text-gray-400">(${formattedTime})</span>`;
+        logContainer.appendChild(logItem);
+    });
+}
+
+// ===== Tải Log từ Firestore (một lần) =====
+async function fetchLogs(projectId) {
+    console.log("Đang tải log thủ công từ Firestore...");
+    try {
+        const logsQuery = query(
+            collection(db, "activity_logs"),
+            where("projectId", "==", projectId),
+            orderBy("timestamp", "desc"),
+            limit(20)
+        );
+        const snapshot = await getDocs(logsQuery);
+        const logs = [];
+        snapshot.forEach((docSnap) => logs.push(docSnap.data()));
+        renderLogs(logs);
+        console.log("Log đã được tải thành công.");
+    } catch (e) {
+        console.error("Lỗi khi tải log thủ công:", e);
+    }
+}
+
+// ===== Thiết lập các phương thức hiển thị Log =====
+function setupLogDisplay(projectId) {
     const logsQuery = query(
         collection(db, "activity_logs"),
         where("projectId", "==", projectId),
         orderBy("timestamp", "desc"),
-        limit(20) // Giới hạn 20 log gần nhất
+        limit(20)
     );
 
+    // Sử dụng onSnapshot để cập nhật thời gian thực (hỗ trợ)
     onSnapshot(logsQuery, (snapshot) => {
         const logs = [];
-        snapshot.forEach((docSnap) => {
-            logs.push(docSnap.data());
-        });
-
-        logContainer.innerHTML = ""; // Xóa nội dung cũ
-        logs.forEach((log) => {
-            const logItem = document.createElement("p");
-            logItem.className = "text-gray-600 my-1";
-            const formattedTime = log.timestamp ? new Date(log.timestamp.toDate()).toLocaleTimeString() : '...';
-            logItem.innerHTML = `<span class="font-semibold text-blue-700">${log.actor}</span>: ${log.description} <span class="text-gray-400">(${formattedTime})</span>`;
-            logContainer.appendChild(logItem);
-        });
+        snapshot.forEach((docSnap) => logs.push(docSnap.data()));
+        renderLogs(logs);
     });
+}
+
+function setupLogRefresh(projectId) {
+    const refreshBtn = document.getElementById("refreshLogsBtn");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", () => fetchLogs(projectId));
+    }
 }
