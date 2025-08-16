@@ -37,9 +37,11 @@ const auth = getAuth(app);
 const projectId = "project123";
 
 // ===== Global unsub/interval guards =====
-let unsubscribeLogs = null;
+let unsubscribeLogs = null;       // dùng cho setupLogDisplay (nếu xài)
 let logsIntervalId = null;
 const unsubscribeGroups = new Map(); // groupId -> unsubscribe tasks listener
+let unsubTaskChanges = null;      // toast tasks
+let unsubLogs = null;             // realtime-prepend cho logs (chính dùng cái này)
 
 // ===== Auth state =====
 onAuthStateChanged(auth, (user) => {
@@ -175,16 +177,15 @@ export function showTaskBoard(projectId) {
     </div>
   `;
 
-loadGroups(projectId);
-setupGroupListeners(projectId);
-setupDragDrop(projectId);
+  loadGroups(projectId);
+  setupGroupListeners(projectId);
+  setupDragDrop(projectId);
 
-// NGỪNG dùng setInterval/polling:
-/// setupLogDisplay(projectId);   // <- BỎ hoặc comment dòng này
-setupLogRefresh(projectId);      // giữ nếu bạn thích nút “Làm mới”
+  // KHÔNG dùng polling logs nữa:
+  // setupLogDisplay(projectId); // <- bỏ hoặc comment nếu trước đó bạn dùng
 
-// Thêm dòng gọi realtime-prepend:
-startRealtimeLogs(projectId);
+  setupLogRefresh(projectId); // vẫn giữ nếu muốn nút “Làm mới”
+  startRealtimeLogs(projectId); // <— realtime-prepend cho logs
 
   listenProjectChanges(projectId); // toast thông báo nhỏ
 }
@@ -238,7 +239,6 @@ function renderGroup(docSnap) {
   const tasksCol = collection(db, "tasks");
   const qTasks = query(tasksCol, where("groupId", "==", gid));
   const unsub = onSnapshot(qTasks, (snapshot) => {
-    // dùng docChanges để tránh render lại toàn bộ
     snapshot.docChanges().forEach((change) => {
       const tid = change.doc.id;
       const oldElement = document.getElementById(`task-${tid}`);
@@ -503,7 +503,7 @@ function setupDragDrop(projectId) {
   });
 }
 
-// ===== Logs: render =====
+// ===== Logs: render (chỉ dùng cho fetch/manual) =====
 function renderLogs(logs) {
   const logContainer = document.getElementById("projectLog");
   if (!logContainer) return;
@@ -527,7 +527,7 @@ function renderLogs(logs) {
   });
 }
 
-// ===== Logs: fetch (1 lần) =====
+// ===== Logs: fetch (thủ công 1 lần) =====
 async function fetchLogs(projectId) {
   try {
     const logsQuery = query(
@@ -554,7 +554,7 @@ async function fetchLogs(projectId) {
   }
 }
 
-// ===== Logs: thiết lập realtime (có fallback polling) =====
+// ===== Logs: thiết lập realtime (có fallback polling) — KHÔNG dùng nữa nếu đã dùng startRealtimeLogs =====
 function setupLogDisplay(projectId) {
   // Hủy listener/interval cũ nếu có
   if (unsubscribeLogs) {
@@ -600,7 +600,6 @@ function setupLogRefresh(projectId) {
 }
 
 // ===== Toast realtime theo thay đổi tasks =====
-let unsubTaskChanges = null;
 function listenProjectChanges(projectId) {
   if (unsubTaskChanges) {
     try { unsubTaskChanges(); } catch {}
@@ -610,23 +609,16 @@ function listenProjectChanges(projectId) {
   unsubTaskChanges = onSnapshot(q, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       const t = change.doc.data() || {};
-      // Có thể bỏ qua event do chính mình nếu muốn:
-      // if (t.updatedBy && t.updatedBy === auth.currentUser?.email) return;
-
       let msg = "";
       if (change.type === "added") msg = `Task mới: "${t.title || change.doc.id}"`;
       if (change.type === "modified") msg = `Task cập nhật: "${t.title || change.doc.id}"`;
       if (change.type === "removed") msg = `Task đã xóa: "${t.title || change.doc.id}"`;
-
       if (msg) showTinyToast(msg);
     });
   });
 }
 
-
 // ===== Realtime logs: thêm mới là hiện lên đầu ngay =====
-let unsubLogs = null;
-
 function startRealtimeLogs(projectId) {
   if (unsubLogs) { try { unsubLogs(); } catch {} unsubLogs = null; }
 
@@ -699,4 +691,3 @@ function startRealtimeLogs(projectId) {
     }
   );
 }
-
