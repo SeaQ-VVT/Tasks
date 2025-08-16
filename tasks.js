@@ -34,7 +34,7 @@ export function showTaskBoard(projectId) {
     const taskBoard = document.getElementById("taskBoard");
 
     taskBoard.innerHTML = `
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-3 gap-4 w-full">
             <!-- To Do -->
             <div class="bg-white p-4 rounded shadow" id="todoArea">
                 <h3 class="font-bold text-lg text-red-600 mb-2">To Do</h3>
@@ -246,3 +246,4 @@ function setupDragDrop(projectId) {
         });
     });
 }
+
