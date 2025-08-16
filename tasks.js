@@ -164,11 +164,11 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // ✅ fix: remove old DOM nếu đã tồn tại
+    // Xóa bản cũ
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
-    const hasComment = t.comment && t.comment.trim() !== "";
+    const hasComment = (t.comment && String(t.comment).trim().length > 0);
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
@@ -184,14 +184,57 @@ function renderTask(docSnap) {
         </div>
     `;
 
+    // drag event
     row.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
+    // ✅ edit task
+    row.querySelector(".edit-task").addEventListener("click", () => {
+        openModal("Edit Task", [
+            { id: "title", placeholder: "Task title", type: "text", value: t.title }
+        ], async (vals) => {
+            await updateDoc(doc(db, "tasks", tid), {
+                title: vals.title,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+        });
+    });
+
+    // ✅ comment task
+    row.querySelector(".comment-task").addEventListener("click", () => {
+        openModal("Comment Task", [
+            { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+        ], async (vals) => {
+            if (vals.comment && vals.comment.trim().length > 0) {
+                await updateDoc(doc(db, "tasks", tid), {
+                    comment: vals.comment.trim(),
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
+            } else {
+                await updateDoc(doc(db, "tasks", tid), {
+                    comment: deleteField(),
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
+            }
+        });
+    });
+
+    // ✅ delete task
+    row.querySelector(".delete-task").addEventListener("click", async () => {
+        if (confirm("Xóa task này?")) {
+            await deleteDoc(doc(db, "tasks", tid));
+        }
+    });
+
     col.appendChild(row);
 }
+
 
 // ===== Group actions =====
 async function addGroup(projectId) {
@@ -267,4 +310,5 @@ function setupDragDrop() {
             });
         });
     });
+
 }
