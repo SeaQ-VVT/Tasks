@@ -1,82 +1,525 @@
-<!DOCTYPE html>
-<html lang="vi">
+ <!DOCTYPE html>
+
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <title>Form gửi dữ liệu</title>
+
+<meta charset="UTF-8">
+
+<title>Task Manager Trello Style</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+
+body { font-family: Arial, sans-serif; background: #f4f5f7; margin: 0; }
+
+header { background: #026aa7; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
+
+header h1 { font-size: 20px; }
+
+#loginPanel, #adminPanel, #projectPanel { margin: 10px; }
+
+.board { display: flex; gap: 10px; padding: 10px; overflow-x: auto; }
+
+.column { background: #ebecf0; border-radius: 5px; width: 300px; padding: 10px; flex-shrink: 0; }
+
+.column h3 { margin-top: 0; }
+
+.task { background: white; padding: 10px; border-radius: 3px; margin-bottom: 10px; box-shadow: 0 1px 0 rgba(9,30,66,.25); display: flex; justify-content: space-between; align-items: center; }
+
+.task .actions { display: flex; gap: 5px; }
+
+.task .comment-icon { color: #888; cursor: pointer; }
+
+.task .comment-new { color: orange; }
+
+.toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 14px; opacity: 0.9; }
+
+#commentPopup { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); display: none; width: 400px; max-height: 80%; overflow-y: auto; }
+
+#commentList { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; margin-bottom: 10px; }
+
+.comment { border-bottom: 1px solid #eee; padding: 4px 0; font-size: 14px; }
+
+</style>
+
 </head>
+
 <body>
-  <h2>Form gửi dữ liệu</h2>
-  <input type="text" id="name" placeholder="Nhập tên"><br><br>
-  <input type="email" id="email" placeholder="Nhập email"><br><br>
-  <button id="submit">Gửi</button>
 
-  <h3>Danh sách dữ liệu</h3>
-  <ul id="dataList"></ul>
 
-  <script type="module">
-    // Import SDK Firebase
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-    import { initializeFirestore, collection, addDoc, getDocs, serverTimestamp } 
-      from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-    // Cấu hình Firebase
-    const firebaseConfig = {
-      apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-      authDomain: "task-manager-d18aa.firebaseapp.com",
-      projectId: "task-manager-d18aa",
-      storageBucket: "task-manager-d18aa.firebasestorage.app",
-      messagingSenderId: "1080268498085",
-      appId: "1:1080268498085:web:767434c6a2c013b961d94c",
-      measurementId: "G-FGGV4QX67R"
-    };
+<header>
 
-    // Khởi tạo app + Firestore (tắt cache)
-    const app = initializeApp(firebaseConfig);
-    const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+<h1>Task Manager</h1>
 
-    const nameInput = document.getElementById('name');
-    const emailInput = document.getElementById('email');
-    const dataList = document.getElementById('dataList');
+<div>
 
-    // Ghi dữ liệu mới
-    document.getElementById('submit').addEventListener('click', async () => {
-      const name = nameInput.value.trim();
-      const email = emailInput.value.trim();
-      if (!name || !email) {
-        alert("Vui lòng nhập đầy đủ tên và email!");
-        return;
-      }
-      try {
-        await addDoc(collection(db, "users"), {
-          name: name,
-          email: email,
-          createdAt: serverTimestamp()
-        });
-        alert("Ghi thành công!");
-        loadData(); // tải lại danh sách
-      } catch (err) {
-        console.error("Lỗi khi ghi:", err);
-      }
-    });
+<span id="userStatus"></span>
 
-    // Đọc dữ liệu từ Firestore
-    async function loadData() {
-      dataList.innerHTML = "";
-      try {
-        const querySnapshot = await getDocs(collection(db, "users"));
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          const li = document.createElement('li');
-          li.textContent = `${data.name || "undefined"} - ${data.email || "undefined"}`;
-          dataList.appendChild(li);
-        });
-      } catch (err) {
-        console.error("Lỗi khi đọc:", err);
-      }
-    }
+<button id="logoutBtn" style="display:none;">Logout</button>
 
-    // Tải ngay khi mở trang
-    loadData();
-  </script>
+</div>
+
+</header>
+
+
+
+<div id="loginPanel">
+
+<input type="text" id="loginUsername" placeholder="Username">
+
+<input type="password" id="loginPassword" placeholder="Password">
+
+<button id="loginBtn">Login</button>
+
+</div>
+
+
+
+<div id="adminPanel" style="display:none;">
+
+<h3>Create New Account (Admin)</h3>
+
+<input type="text" id="newUsername" placeholder="New username">
+
+<input type="password" id="newPassword" placeholder="Initial password">
+
+<button id="createUserBtn">Create</button>
+
+</div>
+
+
+
+<div id="projectPanel" style="display:none;">
+
+<h3>Projects</h3>
+
+<button id="addProjectBtn">+ Add Project</button>
+
+<ul id="projectList"></ul>
+
+</div>
+
+
+
+<div id="boardPanel" style="display:none;">
+
+<button id="backToProjects">← Back to Projects</button>
+
+<div class="board">
+
+<div class="column" id="todoColumn">
+
+<h3>Todo</h3>
+
+<div class="task-list" id="todoList"></div>
+
+<button id="addTodoTask">+ Add Task</button>
+
+</div>
+
+<div class="column" id="processColumn">
+
+<h3>Process</h3>
+
+<div class="task-list" id="processList"></div>
+
+</div>
+
+<div class="column" id="doneColumn">
+
+<h3>Done</h3>
+
+<div class="task-list" id="doneList"></div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<div id="commentPopup">
+
+<h3>Comments</h3>
+
+<div id="commentList"></div>
+
+<input type="text" id="commentInput" placeholder="Write a comment...">
+
+<button id="sendCommentBtn">Send</button>
+
+<button onclick="closeCommentPopup()">Close</button>
+
+</div>
+
+
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+
+
+const firebaseConfig = {
+
+apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+
+authDomain: "task-manager-d18aa.firebaseapp.com",
+
+projectId: "task-manager-d18aa",
+
+storageBucket: "task-manager-d18aa.firebasestorage.app",
+
+messagingSenderId: "1080268498085",
+
+appId: "1:1080268498085:web:767434c6a2c013b961d94c",
+
+measurementId: "G-FGGV4QX67R"
+
+};
+
+const app = initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
+
+const db = getFirestore(app);
+
+
+
+const ADMIN_EMAIL = "admin@myapp.com";
+
+let currentUser = null;
+
+let currentProjectId = null;
+
+let currentCommentTaskId = null;
+
+
+
+document.getElementById('loginBtn').addEventListener('click', async () => {
+
+const username = document.getElementById('loginUsername').value.trim();
+
+const password = document.getElementById('loginPassword').value.trim();
+
+if (!username || !password) return alert("Enter all fields");
+
+const email = `${username}@myapp.com`;
+
+try {
+
+await signInWithEmailAndPassword(auth, email, password);
+
+} catch {
+
+alert("Invalid login");
+
+}
+
+});
+
+
+
+document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+
+
+
+onAuthStateChanged(auth, user => {
+
+currentUser = user;
+
+if (user) {
+
+document.getElementById('userStatus').textContent = user.email;
+
+document.getElementById('logoutBtn').style.display = 'inline-block';
+
+document.getElementById('loginPanel').style.display = 'none';
+
+document.getElementById('projectPanel').style.display = 'block';
+
+if (user.email === ADMIN_EMAIL) {
+
+document.getElementById('adminPanel').style.display = 'block';
+
+} else {
+
+document.getElementById('adminPanel').style.display = 'none';
+
+}
+
+loadProjects();
+
+} else {
+
+document.getElementById('userStatus').textContent = 'Guest';
+
+document.getElementById('logoutBtn').style.display = 'none';
+
+document.getElementById('loginPanel').style.display = 'block';
+
+document.getElementById('adminPanel').style.display = 'none';
+
+document.getElementById('projectPanel').style.display = 'none';
+
+document.getElementById('boardPanel').style.display = 'none';
+
+}
+
+});
+
+
+
+document.getElementById('addProjectBtn').addEventListener('click', async () => {
+
+const name = prompt("Project name:");
+
+if (!name) return;
+
+await addDoc(collection(db, "projects"), {
+
+name,
+
+createdAt: serverTimestamp()
+
+});
+
+});
+
+
+
+function loadProjects() {
+
+const list = document.getElementById('projectList');
+
+list.innerHTML = '';
+
+onSnapshot(collection(db, "projects"), snap => {
+
+list.innerHTML = '';
+
+snap.forEach(docSnap => {
+
+const li = document.createElement('li');
+
+li.textContent = docSnap.data().name;
+
+li.style.cursor = 'pointer';
+
+li.onclick = () => openProject(docSnap.id);
+
+list.appendChild(li);
+
+});
+
+});
+
+}
+
+
+
+function openProject(projectId) {
+
+currentProjectId = projectId;
+
+document.getElementById('projectPanel').style.display = 'none';
+
+document.getElementById('boardPanel').style.display = 'block';
+
+loadTasks();
+
+}
+
+
+
+document.getElementById('backToProjects').addEventListener('click', () => {
+
+currentProjectId = null;
+
+document.getElementById('boardPanel').style.display = 'none';
+
+document.getElementById('projectPanel').style.display = 'block';
+
+});
+
+
+
+document.getElementById('addTodoTask').addEventListener('click', async () => {
+
+const title = prompt("Task title:");
+
+if (!title) return;
+
+await addDoc(collection(db, "projects", currentProjectId, "tasks"), {
+
+title,
+
+status: "todo",
+
+createdAt: serverTimestamp()
+
+});
+
+});
+
+
+
+function renderTask(taskId, taskData, columnEl) {
+
+const div = document.createElement('div');
+
+div.className = 'task';
+
+div.innerHTML = `
+
+<span>${taskData.title}</span>
+
+<div class="actions">
+
+<i class="fa-solid fa-comment comment-icon" data-id="${taskId}"></i>
+
+</div>
+
+`;
+
+div.querySelector('.comment-icon').addEventListener('click', () => openCommentPopup(taskId));
+
+columnEl.appendChild(div);
+
+}
+
+
+
+function loadTasks() {
+
+onSnapshot(collection(db, "projects", currentProjectId, "tasks"), snapshot => {
+
+document.getElementById('todoList').innerHTML = '';
+
+document.getElementById('processList').innerHTML = '';
+
+document.getElementById('doneList').innerHTML = '';
+
+snapshot.forEach(docSnap => {
+
+const data = docSnap.data();
+
+if (data.status === "todo") renderTask(docSnap.id, data, document.getElementById('todoList'));
+
+if (data.status === "process") renderTask(docSnap.id, data, document.getElementById('processList'));
+
+if (data.status === "done") renderTask(docSnap.id, data, document.getElementById('doneList'));
+
+});
+
+});
+
+}
+
+
+
+function openCommentPopup(taskId) {
+
+currentCommentTaskId = taskId;
+
+document.getElementById('commentPopup').style.display = 'block';
+
+loadComments(taskId);
+
+}
+
+
+
+function closeCommentPopup() {
+
+document.getElementById('commentPopup').style.display = 'none';
+
+}
+
+
+
+function loadComments(taskId) {
+
+const commentList = document.getElementById('commentList');
+
+commentList.innerHTML = '';
+
+onSnapshot(collection(db, "projects", currentProjectId, "tasks", taskId, "comments"), snapshot => {
+
+commentList.innerHTML = '';
+
+snapshot.forEach(c => {
+
+const d = c.data();
+
+const div = document.createElement('div');
+
+div.className = 'comment';
+
+div.textContent = `${d.user}: ${d.text}`;
+
+commentList.appendChild(div);
+
+});
+
+});
+
+}
+
+
+
+document.getElementById('sendCommentBtn').addEventListener('click', async () => {
+
+if (!currentCommentTaskId) return;
+
+const text = document.getElementById('commentInput').value.trim();
+
+if (!text) return;
+
+await addDoc(collection(db, "projects", currentProjectId, "tasks", currentCommentTaskId, "comments"), {
+
+user: currentUser ? currentUser.email : "Guest",
+
+text,
+
+createdAt: serverTimestamp()
+
+});
+
+document.getElementById('commentInput').value = '';
+
+showToast("New comment added");
+
+});
+
+
+
+function showToast(msg) {
+
+const t = document.createElement('div');
+
+t.className = 'toast';
+
+t.textContent = msg;
+
+document.body.appendChild(t);
+
+setTimeout(() => t.remove(), 3000);
+
+}
+
+</script>
+
 </body>
+
 </html>
