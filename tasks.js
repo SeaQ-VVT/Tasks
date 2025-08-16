@@ -34,12 +34,23 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-const projectId = "project123";
+// Khai báo biến projectId để lưu ID dự án được nhập sau này
+let projectId = null;
 
 // Lắng nghe trạng thái đăng nhập
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        showTaskBoard(projectId);
+        // Chỉ yêu cầu nhập ID dự án nếu nó chưa được gán
+        if (!projectId) {
+            openModal("Nhập ID Dự án", [{ id: "projectId", placeholder: "ID Dự án của bạn" }], (vals) => {
+                projectId = vals.projectId.trim();
+                if (projectId) {
+                    showTaskBoard();
+                } else {
+                    alert("ID dự án không hợp lệ. Vui lòng làm mới trang để thử lại.");
+                }
+            });
+        }
     } else {
         console.log("Người dùng chưa đăng nhập. Chuyển hướng...");
     }
@@ -52,9 +63,13 @@ async function logActivity(action, targetType, targetId, description, oldValue =
         console.error("Lỗi: Không thể ghi log. Người dùng chưa đăng nhập.");
         return;
     }
+    if (!projectId) {
+        console.error("Lỗi: Không thể ghi log. Chưa có ID dự án.");
+        return;
+    }
     
     try {
-        await addDoc(collection(db, "activity_logs"), {
+        const logDocRef = await addDoc(collection(db, "activity_logs"), {
             projectId: projectId,
             actor: user.email,
             action,
@@ -66,6 +81,15 @@ async function logActivity(action, targetType, targetId, description, oldValue =
             timestamp: serverTimestamp(),
         });
         console.log("Log đã được ghi thành công.");
+
+        // Gửi thông báo đến người dùng khác
+        await addDoc(collection(db, "notifications"), {
+            projectId: projectId,
+            message: `${user.email}: ${description}`,
+            timestamp: serverTimestamp()
+        });
+        console.log("Thông báo đã được gửi thành công.");
+
     } catch (e) {
         console.error("Lỗi khi ghi log hoạt động:", e);
     }
@@ -114,7 +138,7 @@ function openModal(title, fields, onSave) {
 }
 
 // ===== Hiển thị bảng công việc và log =====
-export function showTaskBoard(projectId) {
+export function showTaskBoard() {
     const taskBoard = document.getElementById("taskBoard");
     if (!taskBoard) {
         console.error("Không tìm thấy phần tử 'taskBoard'. Vui lòng kiểm tra HTML.");
@@ -144,13 +168,15 @@ export function showTaskBoard(projectId) {
                 <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
             </div>
         </div>
+        <div id="notification-container" class="fixed bottom-4 right-4 space-y-2 z-50"></div>
     `;
 
     loadGroups(projectId);
-    setupGroupListeners(projectId);
-    setupDragDrop(projectId);
-    setupLogDisplay(projectId);
-    setupLogRefresh(projectId);
+    setupGroupListeners();
+    setupDragDrop();
+    setupLogDisplay();
+    setupLogRefresh();
+    setupNotificationListener();
 }
 
 // ===== Load Groups realtime =====
@@ -184,7 +210,7 @@ function renderGroup(docSnap) {
     `;
     document.getElementById("groupContainer").appendChild(div);
     loadTasks(gid);
-    div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
+    div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid));
     div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
     div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
@@ -285,7 +311,7 @@ function renderTask(docSnap) {
 }
 
 // ===== Group actions =====
-async function addGroup(projectId) {
+async function addGroup() {
     openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
         const docRef = await addDoc(collection(db, "groups"), {
             title: vals.title, projectId, status: "todo",
@@ -318,7 +344,7 @@ async function deleteGroup(groupId, g) {
 }
 
 // ===== Task actions =====
-function openTaskModal(groupId, projectId) {
+function openTaskModal(groupId) {
     openModal("Thêm Task", [
         { id: "title", placeholder: "Tên Task" },
         { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" }
@@ -333,12 +359,12 @@ function openTaskModal(groupId, projectId) {
 }
 
 // ===== Listeners =====
-function setupGroupListeners(projectId) {
-    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
+function setupGroupListeners() {
+    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup());
 }
 
 // ===== Drag & Drop =====
-function setupDragDrop(projectId) {
+function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
         if (!col) return;
@@ -378,7 +404,9 @@ function renderLogs(logs) {
 }
 
 // ===== Tải Log từ Firestore (một lần) =====
-function setupLogDisplay(projectId) {
+function setupLogDisplay() {
+    if (!projectId) return;
+
     const logsQuery = query(
         collection(db, "activity_logs"),
         where("projectId", "==", projectId),
@@ -399,10 +427,11 @@ function setupLogDisplay(projectId) {
     }
 }
 
-function setupLogRefresh(projectId) {
+function setupLogRefresh() {
     const refreshBtn = document.getElementById("refreshLogsBtn");
     if (refreshBtn) {
         refreshBtn.addEventListener("click", async () => {
+            if (!projectId) return;
             try {
                 const logsQuery = query(
                     collection(db, "activity_logs"),
@@ -420,4 +449,36 @@ function setupLogRefresh(projectId) {
             }
         });
     }
+}
+
+// ===== Hiển thị thông báo thời gian thực =====
+function setupNotificationListener() {
+    if (!projectId) return;
+    const notificationsQuery = query(
+        collection(db, "notifications"),
+        where("projectId", "==", projectId),
+        orderBy("timestamp", "desc"),
+        limit(1)
+    );
+    
+    onSnapshot(notificationsQuery, (snapshot) => {
+        if (!snapshot.empty) {
+            const notification = snapshot.docs[0].data();
+            showNotification(notification.message);
+        }
+    });
+}
+
+function showNotification(message) {
+    const container = document.getElementById("notification-container");
+    const notificationDiv = document.createElement("div");
+    notificationDiv.className = "bg-green-500 text-white p-3 rounded-lg shadow-lg mb-2";
+    notificationDiv.textContent = message;
+    
+    container.prepend(notificationDiv);
+
+    // Tự động xóa thông báo sau 5 giây
+    setTimeout(() => {
+        notificationDiv.remove();
+    }, 5000);
 }
