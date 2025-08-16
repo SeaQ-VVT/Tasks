@@ -268,30 +268,38 @@ function setupGroupListeners(projectId) {
 }
 
 // ===== Drag & Drop (fix) =====
-function setupDragDrop() {
-    ["inprogressCol", "doneCol"].forEach((colId) => {
-        const col = document.getElementById(colId);
-        if (!col) return;
+function renderTask(docSnap) {
+    const t = docSnap.data();
+    const tid = docSnap.id;
 
-        col.addEventListener("dragover", (e) => e.preventDefault());
+    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    const col = document.getElementById(colId);
+    if (!col) return;
 
-        col.addEventListener("drop", async (e) => {
-            e.preventDefault();
+    // ✅ FIX: nếu đã có task trong DOM thì remove trước
+    const old = document.getElementById(`task-${tid}`);
+    if (old) old.remove();
 
-            const type = e.dataTransfer.getData("type");
-            if (type !== "task") return;
+    const row = document.createElement("div");
+    row.id = `task-${tid}`;
+    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
+    row.draggable = true;
 
-            const taskId = e.dataTransfer.getData("taskId");
-            const groupId = e.dataTransfer.getData("groupId");
-            if (!taskId || !groupId) return;
+    row.innerHTML = `
+        <span class="truncate">${t.title}</span>
+        <div class="space-x-1">
+            <button class="edit-task">✏️</button>
+            <button class="comment-task ${t.comment ? 'text-blue-600 font-bold' : 'text-gray-400'}">💬</button>
+            <button class="delete-task">🗑️</button>
+        </div>
+    `;
 
-            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
-
-            await updateDoc(doc(db, "tasks", taskId), {
-                status: newStatus,
-                updatedAt: serverTimestamp(),
-                updatedBy: auth.currentUser?.email || "Ẩn danh"
-            });
-        });
+    row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("type", "task");
+        e.dataTransfer.setData("taskId", tid);
+        e.dataTransfer.setData("groupId", t.groupId);
     });
+
+    col.appendChild(row);
 }
+
