@@ -374,9 +374,13 @@ function setupLogDisplay(projectId) {
     );
 
     onSnapshot(logsQuery, (snapshot) => {
-        logContainer.innerHTML = "";
+        const logs = [];
         snapshot.forEach((docSnap) => {
-            const log = docSnap.data();
+            logs.push(docSnap.data());
+        });
+
+        logContainer.innerHTML = ""; // Xóa nội dung cũ
+        logs.forEach((log) => {
             const logItem = document.createElement("p");
             logItem.className = "text-gray-600 my-1";
             const formattedTime = log.timestamp ? new Date(log.timestamp.toDate()).toLocaleTimeString() : '...';
