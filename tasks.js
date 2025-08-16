@@ -50,7 +50,7 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-// ===== Ghi log hoạt động (có clientTsMs để hiển thị ngay) =====
+// ===== Hàm ghi log hoạt động (hiện tức thì nhờ clientTsMs) =====
 async function logActivity(action, targetType, targetId, description, oldValue = null, newValue = null) {
   const user = auth.currentUser;
   if (!user) {
@@ -67,10 +67,9 @@ async function logActivity(action, targetType, targetId, description, oldValue =
       description,
       oldValue,
       newValue,
-      timestamp: serverTimestamp(),  // giờ server (về sau)
-      clientTsMs: Date.now(),        // giờ client (có ngay để order UI)
+      timestamp: serverTimestamp(),   // giờ server (sẽ về sau 1 nhịp)
+      clientTsMs: Date.now(),         // giờ client để hiển thị/sort ngay lập tức
     });
-    // console.log("Log đã được ghi thành công.");
   } catch (e) {
     console.error("Lỗi khi ghi log hoạt động:", e);
   }
@@ -176,11 +175,17 @@ export function showTaskBoard(projectId) {
     </div>
   `;
 
-  loadGroups(projectId);
-  setupGroupListeners(projectId);
-  setupDragDrop(projectId);
-  setupLogDisplay(projectId);
-  setupLogRefresh(projectId);
+loadGroups(projectId);
+setupGroupListeners(projectId);
+setupDragDrop(projectId);
+
+// NGỪNG dùng setInterval/polling:
+/// setupLogDisplay(projectId);   // <- BỎ hoặc comment dòng này
+setupLogRefresh(projectId);      // giữ nếu bạn thích nút “Làm mới”
+
+// Thêm dòng gọi realtime-prepend:
+startRealtimeLogs(projectId);
+
   listenProjectChanges(projectId); // toast thông báo nhỏ
 }
 
@@ -617,3 +622,81 @@ function listenProjectChanges(projectId) {
     });
   });
 }
+
+
+// ===== Realtime logs: thêm mới là hiện lên đầu ngay =====
+let unsubLogs = null;
+
+function startRealtimeLogs(projectId) {
+  if (unsubLogs) { try { unsubLogs(); } catch {} unsubLogs = null; }
+
+  const container = document.getElementById("projectLog");
+  if (!container) return;
+
+  const logsQ = query(
+    collection(db, "activity_logs"),
+    where("projectId", "==", projectId),
+    orderBy("clientTsMs", "desc"),
+    limit(100)
+  );
+
+  const buildLogRow = (id, data) => {
+    const p = document.createElement("p");
+    p.id = `log-${id}`;
+    p.className = "text-gray-600 my-1";
+    const timeText = data?.timestamp?.toDate
+      ? new Date(data.timestamp.toDate()).toLocaleTimeString()
+      : (typeof data?.clientTsMs === "number"
+          ? new Date(data.clientTsMs).toLocaleTimeString() + " (đang đồng bộ)"
+          : "...");
+    p.innerHTML =
+      `<span class="font-semibold text-blue-700">${data.actor || "unknown"}</span>: ` +
+      `${data.description || ""} ` +
+      `<span class="text-gray-400">(${timeText})</span>`;
+    return p;
+  };
+
+  const upsertOnTop = (id, data) => {
+    const exist = document.getElementById(`log-${id}`);
+    if (exist) {
+      exist.replaceWith(buildLogRow(id, data)); // cập nhật nội dung (server time trám lại)
+      return;
+    }
+    const node = buildLogRow(id, data);
+    if (container.firstChild) container.insertBefore(node, container.firstChild);
+    else container.appendChild(node);
+  };
+
+  unsubLogs = onSnapshot(
+    logsQ,
+    (snap) => {
+      if (!container.dataset._init) {
+        // lần đầu: fill theo order desc
+        container.innerHTML = "";
+        const items = [];
+        snap.forEach(d => items.push({ id: d.id, data: d.data() }));
+        for (const { id, data } of items) upsertOnTop(id, data);
+        container.dataset._init = "1";
+        return;
+      }
+
+      // các lần sau: chỉ áp dụng thay đổi
+      snap.docChanges().forEach((chg) => {
+        const id = chg.doc.id;
+        const data = chg.doc.data();
+
+        if (chg.type === "added") {
+          upsertOnTop(id, data);         // log mới -> prepend
+        } else if (chg.type === "modified") {
+          upsertOnTop(id, data);         // cập nhật nội dung
+        } else if (chg.type === "removed") {
+          document.getElementById(`log-${id}`)?.remove();
+        }
+      });
+    },
+    (err) => {
+      console.error("Realtime logs error:", err);
+    }
+  );
+}
+
