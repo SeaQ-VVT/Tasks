@@ -156,6 +156,9 @@
   });
   document.getElementById('cancelCreateUserBtn').addEventListener('click', () => hideModal('createUserModal'));
 
+  // NEW: Add event listener to the message modal's OK button
+  document.getElementById('messageOkBtn').addEventListener('click', () => hideModal('messageModal'));
+
   // Main Action Buttons
   document.getElementById("loginBtn").addEventListener("click", async () => {
     const u = document.getElementById("loginUsername").value.trim();
