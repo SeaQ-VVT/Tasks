@@ -164,7 +164,7 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // ✅ fix: remove old DOM nếu đã tồn tại
+    // fix: remove cũ
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
@@ -188,6 +188,19 @@ function renderTask(docSnap) {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
+    });
+
+    // ====== 🎯 fix: click icon comment để mở popup sửa comment
+    row.querySelector(".comment-task").addEventListener("click", () => {
+        openModal("Comment Task", [
+            { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+        ], async (vals) => {
+            await updateDoc(doc(db, "tasks", tid), {
+                comment: vals.comment,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+        });
     });
 
     col.appendChild(row);
@@ -268,3 +281,4 @@ function setupDragDrop() {
         });
     });
 }
+
