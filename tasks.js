@@ -164,11 +164,12 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // fix: remove cũ
+    // xoá bản cũ nếu có
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
-    const hasComment = t.comment && t.comment.trim() !== "";
+    // ✅ điều kiện fix: comment phải khác null + khác rỗng
+    const hasComment = (t.comment && t.comment.trim().length > 0);
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
@@ -190,7 +191,7 @@ function renderTask(docSnap) {
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    // ====== 🎯 fix: click icon comment để mở popup sửa comment
+    // ====== click để mở popup comment
     row.querySelector(".comment-task").addEventListener("click", () => {
         openModal("Comment Task", [
             { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
@@ -205,6 +206,7 @@ function renderTask(docSnap) {
 
     col.appendChild(row);
 }
+
 
 // ===== Group actions =====
 async function addGroup(projectId) {
@@ -281,4 +283,5 @@ function setupDragDrop() {
         });
     });
 }
+
 
