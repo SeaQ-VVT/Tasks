@@ -399,6 +399,11 @@ async function fetchLogs(projectId) {
 
 // ===== Thiết lập các phương thức hiển thị Log =====
 function setupLogDisplay(projectId) {
+    // Gọi fetchLogs ngay lập tức để đảm bảo log được tải khi trang được mở
+    fetchLogs(projectId);
+    
+    // Sử dụng onSnapshot để cập nhật thời gian thực (hỗ trợ)
+    // Lưu ý: Có thể onSnapshot bị lỗi trên một số trình duyệt
     const logsQuery = query(
         collection(db, "activity_logs"),
         where("projectId", "==", projectId),
@@ -406,7 +411,6 @@ function setupLogDisplay(projectId) {
         limit(20)
     );
 
-    // Sử dụng onSnapshot để cập nhật thời gian thực (hỗ trợ)
     onSnapshot(logsQuery, (snapshot) => {
         const logs = [];
         snapshot.forEach((docSnap) => logs.push(docSnap.data()));
