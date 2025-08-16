@@ -12,7 +12,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-// Test log để biết file đã load chưa
+
 console.log("addproject.js loaded OK");
 
 // Firebase config
@@ -33,10 +33,15 @@ const db = getFirestore(app);
 // DOM elements
 const projectArea = document.getElementById("projectArea");
 const addProjectBtn = document.getElementById("addProjectBtn");
-const projectModal = document.getElementById("projectModal");
 const projectModalTitle = document.getElementById("projectModalTitle");
 const projectTitleInput = document.getElementById("projectTitle");
 const projectDescriptionInput = document.getElementById("projectDescription");
+
+// Thêm các input mới (ngày + comment)
+const projectStartInput = document.getElementById("projectStart");
+const projectEndInput = document.getElementById("projectEnd");
+const projectCommentInput = document.getElementById("projectComment");
+
 const saveProjectBtn = document.getElementById("saveProjectBtn");
 const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 const deleteModal = document.getElementById("deleteModal");
@@ -58,59 +63,35 @@ function hideModal(modalId) {
     modal.classList.remove('flex');
 }
 
-// Function to render a single project card
+// Render project card
 function renderProject(doc) {
     const data = doc.data();
     const id = doc.id;
     const projectCard = document.createElement("div");
-    projectCard.className = "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-105";
+    projectCard.className = "bg-white p-6 rounded-lg shadow-md border border-gray-200";
 
     projectCard.innerHTML = `
         <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
-        <p class="text-gray-600 mb-4">${data.description || "Chưa có mô tả."}</p>
+        <p class="text-gray-600 mb-1"><b>Mô tả:</b> ${data.description || "Chưa có mô tả."}</p>
+        <p class="text-gray-600 mb-1"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
+        <p class="text-gray-600 mb-1"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
+        <p class="text-gray-600 mb-1"><b>Comment:</b> ${data.comment || "-"}</p>
+        <p class="text-gray-500 text-sm italic mb-4">Người tạo: ${data.createdBy || "Không rõ"}</p>
         <div class="flex space-x-2">
-            <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">Sửa</button>
-            <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors">Xóa</button>
+            <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">Sửa</button>
+            <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">Xóa</button>
         </div>
     `;
     projectArea.appendChild(projectCard);
 }
 
-// Real-time listener for projects
-function setupProjectListener() {
-    const projectsCol = collection(db, "projects");
-    const q = query(projectsCol, orderBy("createdAt", "desc"));
-
-    onSnapshot(q, (snapshot) => {
-        projectArea.innerHTML = ""; // Clear existing projects
-        snapshot.forEach((doc) => {
-            renderProject(doc);
-        });
-
-        // Add event listeners to buttons
-        document.querySelectorAll(".edit-btn").forEach((button) => {
-            button.addEventListener("click", (e) => {
-                const id = e.target.dataset.id;
-                const docToEdit = snapshot.docs.find(d => d.id === id);
-                if (docToEdit) {
-                    editProject(id, docToEdit.data());
-                }
-            });
-        });
-
-        document.querySelectorAll(".delete-btn").forEach((button) => {
-            button.addEventListener("click", (e) => {
-                const id = e.target.dataset.id;
-                showDeleteConfirmation(id);
-            });
-        });
-    });
-}
-
-// Add/Update Project logic
+// Save project
 saveProjectBtn.addEventListener("click", async () => {
     const title = projectTitleInput.value.trim();
     const description = projectDescriptionInput.value.trim();
+    const startDate = projectStartInput.value;
+    const endDate = projectEndInput.value;
+    const comment = projectCommentInput.value.trim();
 
     if (!title) {
         alert("Vui lòng nhập tên dự án.");
@@ -118,34 +99,51 @@ saveProjectBtn.addEventListener("click", async () => {
     }
 
     try {
+        const user = auth.currentUser;
+
         if (isEditing) {
             const projectDocRef = doc(db, "projects", currentProjectId);
             await updateDoc(projectDocRef, {
                 title,
                 description,
+                startDate,
+                endDate,
+                comment,
                 updatedAt: new Date(),
             });
         } else {
             await addDoc(collection(db, "projects"), {
                 title,
                 description,
+                startDate,
+                endDate,
+                comment,
+                createdBy: user ? user.email : "Ẩn danh",
                 createdAt: new Date(),
             });
         }
+
+        // ✅ Reset & đóng popup ngay sau khi lưu
         hideModal("projectModal");
         projectTitleInput.value = "";
         projectDescriptionInput.value = "";
+        projectStartInput.value = "";
+        projectEndInput.value = "";
+        projectCommentInput.value = "";
+
     } catch (e) {
         console.error("Error adding/updating document: ", e);
     }
 });
 
-// Show modal for adding a new project
 addProjectBtn.addEventListener("click", () => {
     isEditing = false;
     projectModalTitle.textContent = "Tạo dự án mới";
     projectTitleInput.value = "";
     projectDescriptionInput.value = "";
+    projectStartInput.value = "";   // ✅ reset ngày bắt đầu
+    projectEndInput.value = "";     // ✅ reset ngày kết thúc
+    projectCommentInput.value = ""; // ✅ reset comment
     showModal("projectModal");
 });
 
@@ -156,8 +154,12 @@ function editProject(id, data) {
     projectModalTitle.textContent = "Cập nhật dự án";
     projectTitleInput.value = data.title;
     projectDescriptionInput.value = data.description;
+    projectStartInput.value = data.startDate || "";   // ✅
+    projectEndInput.value = data.endDate || "";       // ✅
+    projectCommentInput.value = data.comment || "";   // ✅
     showModal("projectModal");
 }
+
 
 // Show delete confirmation modal
 function showDeleteConfirmation(id) {
@@ -197,3 +199,4 @@ auth.onAuthStateChanged(user => {
         addProjectBtn.classList.add('hidden');
     }
 });
+
