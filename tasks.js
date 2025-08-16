@@ -318,45 +318,66 @@ function setupGroupListeners(projectId) {
 
 // ===== Drag & Drop =====
 function setupDragDrop() {
-    ["inprogressCol", "doneCol"].forEach((colId) => {
+    ["todoArea", "inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
+        if (!col) return;
+
         col.addEventListener("dragover", (e) => e.preventDefault());
+
         col.addEventListener("drop", async (e) => {
             e.preventDefault();
             const type = e.dataTransfer.getData("type");
-            let newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+            let newStatus = colId === "inprogressCol" ? "inprogress" :
+                            colId === "doneCol" ? "done" : "todo";
 
             if (type === "task") {
                 const taskId = e.dataTransfer.getData("taskId");
                 const groupId = e.dataTransfer.getData("groupId");
+
                 await updateDoc(doc(db, "tasks", taskId), {
-                    status: newStatus, updatedAt: serverTimestamp(),
+                    status: newStatus,
+                    updatedAt: serverTimestamp(),
                     updatedBy: auth.currentUser?.email || "Ẩn danh"
                 });
+
                 await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-task", taskTitle: taskId,
-                    user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
+                    action: "move-task",
+                    taskTitle: taskId, // nếu muốn đẹp hơn thì fetch title
+                    user: auth.currentUser?.email || "Ẩn danh",
+                    time: serverTimestamp()
                 });
             }
 
             if (type === "group") {
                 const groupId = e.dataTransfer.getData("groupId");
-                const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
+
+                const taskSnap = await getDocs(query(
+                    collection(db, "tasks"),
+                    where("groupId", "==", groupId)
+                ));
+
                 taskSnap.forEach(async (t) => {
                     await updateDoc(doc(db, "tasks", t.id), {
-                        status: newStatus, updatedAt: serverTimestamp(),
+                        status: newStatus,
+                        updatedAt: serverTimestamp(),
                         updatedBy: auth.currentUser?.email || "Ẩn danh"
                     });
                 });
+
                 await updateDoc(doc(db, "groups", groupId), {
-                    status: newStatus, updatedAt: serverTimestamp(),
+                    status: newStatus,
+                    updatedAt: serverTimestamp(),
                     updatedBy: auth.currentUser?.email || "Ẩn danh"
                 });
+
                 await addDoc(collection(db, "groups", groupId, "logs"), {
-                    action: "move-group", groupTitle: groupId,
-                    user: auth.currentUser?.email || "Ẩn danh", time: serverTimestamp()
+                    action: "move-group",
+                    groupTitle: groupId,
+                    user: auth.currentUser?.email || "Ẩn danh",
+                    time: serverTimestamp()
                 });
             }
         });
     });
 }
+
