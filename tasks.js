@@ -399,23 +399,12 @@ async function fetchLogs(projectId) {
 
 // ===== Thiết lập các phương thức hiển thị Log =====
 function setupLogDisplay(projectId) {
-    // Gọi fetchLogs ngay lập tức để đảm bảo log được tải khi trang được mở
+    // Tải log ban đầu
     fetchLogs(projectId);
     
-    // Sử dụng onSnapshot để cập nhật thời gian thực (hỗ trợ)
-    // Lưu ý: Có thể onSnapshot bị lỗi trên một số trình duyệt
-    const logsQuery = query(
-        collection(db, "activity_logs"),
-        where("projectId", "==", projectId),
-        orderBy("timestamp", "desc"),
-        limit(20)
-    );
-
-    onSnapshot(logsQuery, (snapshot) => {
-        const logs = [];
-        snapshot.forEach((docSnap) => logs.push(docSnap.data()));
-        renderLogs(logs);
-    });
+    // Tạo một vòng lặp để tải log định kỳ
+    // Đây là cách thay thế đáng tin cậy cho onSnapshot nếu nó không hoạt động
+    setInterval(() => fetchLogs(projectId), 3000); // Tải lại log mỗi 3 giây
 }
 
 function setupLogRefresh(projectId) {
