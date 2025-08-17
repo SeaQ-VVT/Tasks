@@ -73,6 +73,12 @@ function openModal(title, fields, onSave) {
     };
 }
 
+// ===== Get user display name from email =====
+function getUserDisplayName(email) {
+    if (!email) return "Ẩn danh";
+    return email.split('@')[0];
+}
+
 // ===== LOGGING FUNCTION =====
 async function logAction(projectId, action) {
     const user = auth.currentUser?.email || "Ẩn danh";
@@ -104,8 +110,9 @@ function listenForLogs(projectId) {
         logEntries.innerHTML = "";
         logs.forEach((data) => {
             const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+            const userDisplayName = getUserDisplayName(data.user);
             const logItem = document.createElement("div");
-            logItem.textContent = `[${timestamp}] ${data.user} đã ${data.action}.`;
+            logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
             logEntries.appendChild(logItem);
         });
     });
