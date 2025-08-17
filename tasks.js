@@ -11,7 +11,6 @@ import {
     updateDoc,
     serverTimestamp,
     getDocs,
-    orderBy,
     deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
@@ -88,16 +87,22 @@ async function logAction(projectId, action) {
 // ===== LISTEN AND DISPLAY LOGS FUNCTION =====
 function listenForLogs(projectId) {
     const logsCol = collection(db, "logs");
-    const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
+    const q = query(logsCol, where("projectId", "==", projectId));
 
     onSnapshot(q, (snapshot) => {
         const logEntries = document.getElementById("logEntries");
         if (!logEntries) return;
         
-        // Clear and re-populate with latest data
-        logEntries.innerHTML = "";
+        // Sort the logs by timestamp in descending order using JavaScript
+        const logs = [];
         snapshot.forEach((doc) => {
-            const data = doc.data();
+            logs.push(doc.data());
+        });
+
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        logEntries.innerHTML = "";
+        logs.forEach((data) => {
             const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
             const logItem = document.createElement("div");
             logItem.textContent = `[${timestamp}] ${data.user} đã ${data.action}.`;
