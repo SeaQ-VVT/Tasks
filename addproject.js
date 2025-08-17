@@ -52,6 +52,7 @@ const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
 
 let isEditing = false;
+let isCopying = false;
 let currentProjectId = null;
 
 // ===== Utility =====
@@ -89,6 +90,7 @@ function renderProject(doc) {
         <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
         <div class="flex space-x-2 mt-2">
             <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+            <button data-id="${id}" class="copy-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
             <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
             <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
         </div>
@@ -125,6 +127,16 @@ function setupProjectListener() {
             });
         });
 
+        document.querySelectorAll(".copy-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                const id = e.target.dataset.id;
+                const docToCopy = snapshot.docs.find((d) => d.id === id);
+                if (docToCopy) {
+                    copyProject(id, docToCopy.data());
+                }
+            });
+        });
+
         document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 const id = e.target.dataset.id;
@@ -138,7 +150,7 @@ function setupProjectListener() {
         });
     });
 }
-// ===== Add / Update project =====
+// ===== Add / Update / Copy project =====
 saveProjectBtn.addEventListener("click", async () => {
     const title = projectTitleInput.value.trim();
     const description = projectDescriptionInput.value.trim();
@@ -165,6 +177,39 @@ saveProjectBtn.addEventListener("click", async () => {
                 comment,
                 updatedAt: new Date(),
             });
+        } else if (isCopying) {
+            // Step 1: Create a new project document
+            const newProjectRef = await addDoc(collection(db, "projects"), {
+                title,
+                description,
+                startDate,
+                endDate,
+                comment,
+                createdAt: new Date(),
+                createdBy: user ? user.email : "Ẩn danh",
+            });
+            const newProjectId = newProjectRef.id;
+
+            // Step 2: Find and copy all tasks associated with the old project
+            const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
+            const tasksSnapshot = await getDocs(tasksQuery);
+            const tasksToCopy = tasksSnapshot.docs.map(taskDoc => {
+                const data = taskDoc.data();
+                return addDoc(collection(db, "tasks"), { ...data, projectId: newProjectId });
+            });
+            await Promise.all(tasksToCopy);
+
+            // Step 3: Find and copy all logs associated with the old project
+            const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
+            const logsSnapshot = await getDocs(logsQuery);
+            const logsToCopy = logsSnapshot.docs.map(logDoc => {
+                const data = logDoc.data();
+                return addDoc(collection(db, "logs"), { ...data, projectId: newProjectId });
+            });
+            await Promise.all(logsToCopy);
+
+            console.log("Project and all associated data copied successfully!");
+
         } else {
             await addDoc(collection(db, "projects"), {
                 title,
@@ -183,15 +228,18 @@ saveProjectBtn.addEventListener("click", async () => {
         projectStartInput.value = "";
         projectEndInput.value = "";
         projectCommentInput.value = "";
+        isEditing = false;
+        isCopying = false;
 
     } catch (e) {
-        console.error("Error adding/updating project: ", e);
+        console.error("Error adding/updating/copying project: ", e);
     }
 });
 
 // ===== Edit project =====
 function editProject(id, data) {
     isEditing = true;
+    isCopying = false;
     currentProjectId = id;
 
     projectModalTitle.textContent = "Cập nhật dự án";
@@ -203,6 +251,23 @@ function editProject(id, data) {
 
     showModal("projectModal");
 }
+
+// ===== Copy project =====
+function copyProject(id, data) {
+    isEditing = false;
+    isCopying = true;
+    currentProjectId = id;
+    
+    projectModalTitle.textContent = `Sao chép dự án "${data.title}"`;
+    projectTitleInput.value = `${data.title} (Bản sao)`;
+    projectDescriptionInput.value = data.description || "";
+    projectStartInput.value = data.startDate || "";
+    projectEndInput.value = data.endDate || "";
+    projectCommentInput.value = data.comment || "";
+    
+    showModal("projectModal");
+}
+
 
 // ===== Delete project and associated data =====
 function showDeleteConfirmation(id) {
@@ -245,6 +310,7 @@ cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
 // ===== Add project modal =====
 addProjectBtn.addEventListener("click", () => {
     isEditing = false;
+    isCopying = false;
     projectModalTitle.textContent = "Tạo dự án mới";
     projectTitleInput.value = "";
     projectDescriptionInput.value = "";
