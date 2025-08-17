@@ -42,7 +42,7 @@ const projectEndInput = document.getElementById("projectEndDate");
 const projectCommentInput = document.getElementById("projectComment");
 const saveProjectBtn = document.getElementById("saveProjectBtn");
 const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
-const cancelDeleteBtn = document = document.getElementById("cancelDeleteBtn");
+const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
 const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 
 // Initialize Firebase and Auth
