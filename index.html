@@ -1,327 +1,326 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trang quản lý tài khoản</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Set a custom font -->
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Simple styling for the nav bar */
-        .nav-bar {
-            background-color: #334155;
-            color: white;
-            padding: 1rem 2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Trang quản lý tài khoản</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+
+    /* Nav bar */
+    .nav-bar {
+      background-color: #334155;
+      color: white;
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 0.75rem;
+      box-shadow: 0 4px 6px rgba(0,0,0,.1);
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      transition: transform .25s ease, opacity .25s ease;
+    }
+    /* Auto-hide */
+    .nav-hidden { transform: translateY(-95%); opacity: 0; }
+    .nav-visible { transform: translateY(0); opacity: 1; }
+
+    /* “Vùng nóng” kích hoạt khi rê chuột sát mép trên */
+    #navHotZone {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 16px;         /* tăng nếu muốn dễ bắt hơn */
+      z-index: 1100;        /* cao hơn nav-bar */
+    }
+  </style>
 </head>
+
 <body class="bg-gray-100 p-4 pt-20">
-    <!-- Navigation Bar -->
-    <div class="nav-bar">
-        <h1 class="text-xl font-bold">Quản lý người dùng và Dự án</h1>
-        <div class="flex items-center space-x-4">
-            <div id="status" class="text-sm">Chưa đăng nhập</div>
-            <div id="navButtons" class="flex items-center space-x-4 hidden">
-                <button id="showChangePassModalBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition-colors">Đổi mật khẩu</button>
-                <button id="showCreateUserModalBtn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-medium transition-colors hidden">Tạo tài khoản mới</button>
-                <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-medium transition-colors">Đăng xuất</button>
-            </div>
-        </div>
+  <!-- Navigation Bar -->
+  <div class="nav-bar" id="navBar">
+    <h1 class="text-xl font-bold">Quản lý người dùng và Dự án</h1>
+    <div class="flex items-center space-x-4">
+      <div id="status" class="text-sm">Chưa đăng nhập</div>
+      <div id="navButtons" class="flex items-center space-x-4 hidden">
+        <button id="showChangePassModalBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition-colors">Đổi mật khẩu</button>
+        <button id="showCreateUserModalBtn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-medium transition-colors hidden">Tạo tài khoản mới</button>
+        <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-medium transition-colors">Đăng xuất</button>
+      </div>
     </div>
+  </div>
 
-   <div class="w-full flex justify-center mt-6">
-        <div class="bg-white rounded-2xl shadow-xl w-full p-8 border border-gray-200">
-            <!-- Login Section -->
-            <div id="loginSection" class="space-y-4">
-                <h3 class="text-xl font-semibold text-gray-700 text-center mb-4">Đăng nhập</h3>
-                <input id="loginUsername" type="text" placeholder="Username (VD: admin)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-                <input id="loginPassword" type="password" placeholder="Mật khẩu" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-                <button id="loginBtn" class="w-full p-3 mt-4 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">Đăng nhập</button>
-            </div>
+  <div class="w-full flex justify-center mt-6">
+    <div class="bg-white rounded-2xl shadow-xl w-full p-8 border border-gray-200">
+      <!-- Login Section -->
+      <div id="loginSection" class="space-y-4">
+        <h3 class="text-xl font-semibold text-gray-700 text-center mb-4">Đăng nhập</h3>
+        <input id="loginUsername" type="text" placeholder="Username (VD: admin)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+        <input id="loginPassword" type="password" placeholder="Mật khẩu" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+        <button id="loginBtn" class="w-full p-3 mt-4 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">Đăng nhập</button>
+      </div>
 
-            <!-- Main Content for other features (currently empty) -->
-            <div id="mainContent" class="hidden">
-                <hr class="my-6 border-gray-200">
-                <!-- Project Management Section -->
-                <div id="projectControls" class="flex justify-between items-center mb-4">
-                    <h3 class="text-2xl font-semibold text-gray-800">Quản lý dự án</h3>
-                    <button id="addProjectBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">Thêm dự án mới</button>
-                </div>
-                <div id="projectArea" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <!-- Projects will be displayed here -->
-                </div>
-                <div id="taskBoard" class="mt-6"></div>
-            </div>
+      <!-- Main Content -->
+      <div id="mainContent" class="hidden">
+        <hr class="my-6 border-gray-200">
+        <div id="projectControls" class="flex justify-between items-center mb-4">
+          <h3 class="text-2xl font-semibold text-gray-800">Quản lý dự án</h3>
+          <button id="addProjectBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors hidden">Thêm dự án mới</button>
         </div>
+        <div id="projectArea" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+        <div id="taskBoard" class="mt-6"></div>
+      </div>
     </div>
+  </div>
 
-    <!-- Change Password Modal -->
-    <div id="changePassModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <h3 class="text-xl font-semibold text-gray-700 mb-4">Đổi mật khẩu của bạn</h3>
-            <input id="newPassInput" type="password" placeholder="Mật khẩu mới" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-            <div class="mt-4 flex space-x-2">
-                <button id="changePassBtn" class="flex-1 p-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">Đổi mật khẩu</button>
-                <button id="cancelChangePassBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Huỷ</button>
-            </div>
-        </div>
+  <!-- Change Password Modal -->
+  <div id="changePassModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
+      <h3 class="text-xl font-semibold text-gray-700 mb-4">Đổi mật khẩu của bạn</h3>
+      <input id="newPassInput" type="password" placeholder="Mật khẩu mới" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <div class="mt-4 flex space-x-2">
+        <button id="changePassBtn" class="flex-1 p-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">Đổi mật khẩu</button>
+        <button id="cancelChangePassBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Huỷ</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Create User Modal -->
-    <div id="createUserModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <h3 class="text-xl font-semibold text-gray-700 mb-4">Tạo tài khoản mới</h3>
-            <input id="newEmail" type="email" placeholder="Email tài khoản mới" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-            <input id="newPassword" type="password" placeholder="Mật khẩu mới" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-            <input id="newDisplayName" type="text" placeholder="Tên hiển thị (tuỳ chọn)" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-            <div class="mt-4 flex space-x-2">
-                <button id="createUserBtn" class="flex-1 p-3 text-white bg-green-500 hover:bg-green-600 rounded-lg font-medium transition duration-200">Tạo tài khoản</button>
-                <button id="cancelCreateUserBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Huỷ</button>
-            </div>
-        </div>
+  <!-- Create User Modal -->
+  <div id="createUserModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
+      <h3 class="text-xl font-semibold text-gray-700 mb-4">Tạo tài khoản mới</h3>
+      <input id="newEmail" type="email" placeholder="Email tài khoản mới" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <input id="newPassword" type="password" placeholder="Mật khẩu mới" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <input id="newDisplayName" type="text" placeholder="Tên hiển thị (tuỳ chọn)" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <div class="mt-4 flex space-x-2">
+        <button id="createUserBtn" class="flex-1 p-3 text-white bg-green-500 hover:bg-green-600 rounded-lg font-medium transition duration-200">Tạo tài khoản</button>
+        <button id="cancelCreateUserBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Huỷ</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Project Modal -->
-    <div id="projectModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
-            <h3 id="projectModalTitle" class="text-xl font-semibold text-gray-700 mb-4 text-center">Tạo dự án mới</h3>
-            <input id="projectTitle" type="text" placeholder="Tên dự án" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
-            <textarea id="projectDescription" placeholder="Mô tả dự án (tùy chọn)" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 resize-none h-32"></textarea>
-                    <!-- Ngày bắt đầu -->
-        <input id="projectStartDate" type="date" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+  <!-- Project Modal -->
+  <div id="projectModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+      <h3 id="projectModalTitle" class="text-xl font-semibold text-gray-700 mb-4 text-center">Tạo dự án mới</h3>
+      <input id="projectTitle" type="text" placeholder="Tên dự án" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <textarea id="projectDescription" placeholder="Mô tả dự án (tùy chọn)" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 resize-none h-32"></textarea>
 
-        <!-- Ngày kết thúc -->
-        <input id="projectEndDate" type="date" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <input id="projectStartDate" type="date" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <input id="projectEndDate" type="date" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
+      <textarea id="projectComment" placeholder="Ghi chú / Comment" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 resize-none h-24"></textarea>
 
-        <!-- Comment -->
-        <textarea id="projectComment" placeholder="Ghi chú / Comment" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200 resize-none h-24"></textarea>
-
-            <div class="mt-4 flex space-x-2">
-                <button id="saveProjectBtn" class="flex-1 p-3 text-white bg-green-500 hover:bg-green-600 rounded-lg font-medium transition duration-200">Lưu dự án</button>
-                <button id="cancelProjectBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Hủy</button>
-            </div>
-        </div>
+      <div class="mt-4 flex space-x-2">
+        <button id="saveProjectBtn" class="flex-1 p-3 text-white bg-green-500 hover:bg-green-600 rounded-lg font-medium transition duration-200">Lưu dự án</button>
+        <button id="cancelProjectBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Hủy</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Delete Confirmation Modal -->
-    <div id="deleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <h3 class="text-xl font-semibold text-gray-700 mb-4">Xác nhận xóa</h3>
-            <p class="text-gray-600 mb-6">Bạn có chắc chắn muốn xóa dự án này không? Thao tác này không thể hoàn tác.</p>
-            <div class="flex space-x-2">
-                <button id="confirmDeleteBtn" class="flex-1 p-3 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition duration-200">Xóa</button>
-                <button id="cancelDeleteBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Hủy</button>
-            </div>
-        </div>
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
+      <h3 class="text-xl font-semibold text-gray-700 mb-4">Xác nhận xóa</h3>
+      <p class="text-gray-600 mb-6">Bạn có chắc chắn muốn xóa dự án này không? Thao tác này không thể hoàn tác.</p>
+      <div class="flex space-x-2">
+        <button id="confirmDeleteBtn" class="flex-1 p-3 text-white bg-red-600 hover:bg-red-700 rounded-lg font-medium transition duration-200">Xóa</button>
+        <button id="cancelDeleteBtn" class="flex-1 p-3 text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition duration-200">Hủy</button>
+      </div>
     </div>
+  </div>
 
-    <!-- Custom Message Modal (for alerts) -->
-    <div id="messageModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
-            <p id="messageText" class="text-gray-800 mb-6"></p>
-            <button id="messageOkBtn" class="w-full p-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">OK</button>
-        </div>
+  <!-- Custom Message Modal -->
+  <div id="messageModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6 text-center">
+      <p id="messageText" class="text-gray-800 mb-6"></p>
+      <button id="messageOkBtn" class="w-full p-3 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">OK</button>
     </div>
+  </div>
 
-    <script type="module">
-        // Firebase SDKs are imported via CDN
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-        import {
-            getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
-            updatePassword, createUserWithEmailAndPassword, updateProfile
-        } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-        import {
-            getFirestore, doc, setDoc
-        } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+  <!-- App scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import {
+      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged,
+      updatePassword, createUserWithEmailAndPassword, updateProfile
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-        // Configuration from the user's original file
-        const firebaseConfig = {
-            apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-            authDomain: "task-manager-d18aa.firebaseapp.com",
-            projectId: "task-manager-d18aa",
-            storageBucket: "task-manager-d18aa.appspot.com",
-            messagingSenderId: "1080268498085",
-            appId: "1:1080268498085:web:767434c6a2c013b961d94c"
-        };
+    const firebaseConfig = {
+      apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+      authDomain: "task-manager-d18aa.firebaseapp.com",
+      projectId: "task-manager-d18aa",
+      storageBucket: "task-manager-d18aa.appspot.com",
+      messagingSenderId: "1080268498085",
+      appId: "1:1080268498085:web:767434c6a2c013b961d94c"
+    };
 
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const ADMIN_EMAIL = "admin@myapp.com";
-        let currentUser = null;
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const ADMIN_EMAIL = "admin@myapp.com";
+    let currentUser = null;
 
-        // --- Utility functions for UI ---
-        // Show a custom message modal
-        function showMessage(message) {
-            const modal = document.getElementById('messageModal');
-            document.getElementById('messageText').textContent = message;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+    // helper rút đuôi email
+    function displayName(email) {
+      if (!email) return "Ẩn danh";
+      return String(email).split("@")[0];
+    }
+
+    // Message modal
+    function showMessage(message) {
+      const modal = document.getElementById('messageModal');
+      document.getElementById('messageText').textContent = message;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+    function hideModal(modalId) {
+      const modal = document.getElementById(modalId);
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+    document.getElementById('messageOkBtn').addEventListener('click', () => hideModal('messageModal'));
+
+    // Buttons
+    document.getElementById('showChangePassModalBtn').addEventListener('click', () => {
+      document.getElementById('changePassModal').classList.remove('hidden');
+      document.getElementById('changePassModal').classList.add('flex');
+    });
+    document.getElementById('cancelChangePassBtn').addEventListener('click', () => hideModal('changePassModal'));
+
+    document.getElementById('showCreateUserModalBtn').addEventListener('click', () => {
+      document.getElementById('createUserModal').classList.remove('hidden');
+      document.getElementById('createUserModal').classList.add('flex');
+    });
+    document.getElementById('cancelCreateUserBtn').addEventListener('click', () => hideModal('createUserModal'));
+
+    document.getElementById("loginBtn").addEventListener("click", async () => {
+      const u = document.getElementById("loginUsername").value.trim();
+      const p = document.getElementById("loginPassword").value.trim();
+      if (!u || !p) { showMessage("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu."); return; }
+      try {
+        await signInWithEmailAndPassword(auth, `${u}@myapp.com`, p);
+      } catch (err) {
+        let errorMessage = "Sai tài khoản hoặc mật khẩu.";
+        if (err.code === "auth/invalid-email") errorMessage = "Email không hợp lệ. Vui lòng kiểm tra lại định dạng email.";
+        else if (err.code === "auth/user-not-found") errorMessage = "Tài khoản không tồn tại.";
+        showMessage(errorMessage);
+        console.error(err);
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+
+    document.getElementById("changePassBtn").addEventListener("click", async () => {
+      const newPass = document.getElementById("newPassInput").value.trim();
+      if (!newPass) { showMessage("Vui lòng nhập mật khẩu mới."); return; }
+      try {
+        await updatePassword(currentUser, newPass);
+        showMessage("Đổi mật khẩu thành công!");
+        hideModal('changePassModal');
+      } catch (err) {
+        showMessage("Lỗi: " + err.message);
+        console.error(err);
+      }
+    });
+
+    document.getElementById("createUserBtn").addEventListener("click", async () => {
+      const email = document.getElementById("newEmail").value.trim();
+      const pass = document.getElementById("newPassword").value.trim();
+      const name = document.getElementById("newDisplayName").value.trim();
+      if (!email || !pass) { showMessage("Vui lòng nhập email và mật khẩu."); return; }
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        if (name) {
+          await updateProfile(cred.user, { displayName: name });
+          await setDoc(doc(db, "users", cred.user.uid), { displayName: name, email: cred.user.email });
         }
+        showMessage(`Tạo tài khoản thành công: ${email}`);
+        hideModal('createUserModal');
+      } catch (err) {
+        let errorMessage = "Lỗi tạo user: " + err.message;
+        if (err.code === "auth/invalid-email") errorMessage = "Email không hợp lệ. Vui lòng kiểm tra lại định dạng email.";
+        else if (err.code === "auth/email-already-in-use") errorMessage = "Email này đã được sử dụng.";
+        else if (err.code === "auth/weak-password") errorMessage = "Mật khẩu quá yếu. Vui lòng sử dụng mật khẩu mạnh hơn.";
+        showMessage(errorMessage);
+        console.error(err);
+      }
+    });
 
-        // Hide modal function
-        function hideModal(modalId) {
-            const modal = document.getElementById(modalId);
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
-        }
+    // --- Auth State Change Listener ---
+    onAuthStateChanged(auth, user => {
+      currentUser = user;
+      const status = document.getElementById("status");
+      const loginSection = document.getElementById("loginSection");
+      const mainContent = document.getElementById("mainContent");
+      const navButtons = document.getElementById("navButtons");
+      const showCreateUserModalBtn = document.getElementById("showCreateUserModalBtn");
+      const addProjectBtn = document.getElementById("addProjectBtn");
 
-        // NEW: Add event listener to the message modal's OK button
-        document.getElementById('messageOkBtn').addEventListener('click', () => hideModal('messageModal'));
+      // Default UI
+      loginSection.classList.remove('hidden');
+      mainContent.classList.add('hidden');
+      navButtons.classList.add('hidden');
+      status.textContent = "Chưa đăng nhập";
 
-        // --- Event Listeners for Buttons ---
-        // Show/Hide Modals
-        document.getElementById('showChangePassModalBtn').addEventListener('click', () => {
-            document.getElementById('changePassModal').classList.remove('hidden');
-            document.getElementById('changePassModal').classList.add('flex');
-        });
-        document.getElementById('cancelChangePassBtn').addEventListener('click', () => hideModal('changePassModal'));
+      if (!user) return;
 
-        document.getElementById('showCreateUserModalBtn').addEventListener('click', () => {
-            document.getElementById('createUserModal').classList.remove('hidden');
-            document.getElementById('createUserModal').classList.add('flex');
-        });
-        document.getElementById('cancelCreateUserBtn').addEventListener('click', () => hideModal('createUserModal'));
+      // Logged in
+      loginSection.classList.add('hidden');
+      mainContent.classList.remove('hidden');
+      navButtons.classList.remove('hidden');
 
-        // Main Action Buttons
-        document.getElementById("loginBtn").addEventListener("click", async () => {
-            const u = document.getElementById("loginUsername").value.trim();
-            const p = document.getElementById("loginPassword").value.trim();
-            if (!u || !p) {
-                showMessage("Vui lòng nhập đầy đủ tên đăng nhập và mật khẩu.");
-                return;
-            }
-            try {
-                await signInWithEmailAndPassword(auth, `${u}@myapp.com`, p);
-            } catch (err) {
-                let errorMessage = "Sai tài khoản hoặc mật khẩu.";
-                if (err.code === "auth/invalid-email") {
-                    errorMessage = "Email không hợp lệ. Vui lòng kiểm tra lại định dạng email.";
-                } else if (err.code === "auth/user-not-found") {
-                    errorMessage = "Tài khoản không tồn tại.";
-                }
-                showMessage(errorMessage);
-                console.error(err);
-            }
-        });
+      const email = user.email;
+      const isAdmin = email === ADMIN_EMAIL;
 
-        document.getElementById("logoutBtn").addEventListener("click", () => signOut(auth));
+      // Hiển thị username (bỏ đuôi domain)
+      status.textContent = `Tài khoản: ${displayName(email)}   Vai trò: ${isAdmin ? "Admin" : "Người dùng"}`;
 
-        document.getElementById("changePassBtn").addEventListener("click", async () => {
-            const newPass = document.getElementById("newPassInput").value.trim();
-            if (!newPass) {
-                showMessage("Vui lòng nhập mật khẩu mới.");
-                return;
-            }
-            try {
-                await updatePassword(currentUser, newPass);
-                showMessage("Đổi mật khẩu thành công!");
-                hideModal('changePassModal');
-            } catch (err) {
-                showMessage("Lỗi: " + err.message);
-                console.error(err);
-            }
-        });
+      if (isAdmin) {
+        showCreateUserModalBtn.classList.remove('hidden');
+        addProjectBtn.classList.remove('hidden');
+      } else {
+        showCreateUserModalBtn.classList.add('hidden');
+        addProjectBtn.classList.add('hidden');
+      }
+    });
 
-        document.getElementById("createUserBtn").addEventListener("click", async () => {
-            const email = document.getElementById("newEmail").value.trim();
-            const pass = document.getElementById("newPassword").value.trim();
-            const name = document.getElementById("newDisplayName").value.trim();
-            if (!email || !pass) {
-                showMessage("Vui lòng nhập email và mật khẩu.");
-                return;
-            }
-            try {
-                const cred = await createUserWithEmailAndPassword(auth, email, pass);
-                if (name) {
-                    await updateProfile(cred.user, { displayName: name });
-                    await setDoc(doc(db, "users", cred.user.uid), { displayName: name, email: cred.user.email });
-                }
-                showMessage(`Tạo tài khoản thành công: ${email}`);
-                hideModal('createUserModal');
-            } catch (err) {
-                let errorMessage = "Lỗi tạo user: " + err.message;
-                if (err.code === "auth/invalid-email") {
-                    errorMessage = "Email không hợp lệ. Vui lòng kiểm tra lại định dạng email.";
-                } else if (err.code === "auth/email-already-in-use") {
-                    errorMessage = "Email này đã được sử dụng.";
-                } else if (err.code === "auth/weak-password") {
-                    errorMessage = "Mật khẩu quá yếu. Vui lòng sử dụng mật khẩu mạnh hơn.";
-                }
-                showMessage(errorMessage);
-                console.error(err);
-            }
-        });
-        // đặt trên đây, trước onAuthStateChanged
-function displayName(email) {
-    if (!email) return "Ẩn danh";
-    return String(email).split("@")[0];
-}
-        // --- Auth State Change Listener ---
-        onAuthStateChanged(auth, user => {
-            currentUser = user;
-            const status = document.getElementById("status");
-            const loginSection = document.getElementById("loginSection");
-            const mainContent = document.getElementById("mainContent");
-            const navButtons = document.getElementById("navButtons");
-            const showCreateUserModalBtn = document.getElementById("showCreateUserModalBtn");
-            const addProjectBtn = document.getElementById("addProjectBtn");
+    // ==== Auto-hide nav on hover near top ====
+    const navBar = document.getElementById('navBar');
 
-            // Default UI state
-            loginSection.classList.remove('hidden');
-            mainContent.classList.add('hidden');
-            navButtons.classList.add('hidden');
-            status.textContent = "Chưa đăng nhập";
+    // Tạo “vùng nóng” sát mép trên
+    const hot = document.createElement('div');
+    hot.id = 'navHotZone';
+    document.body.appendChild(hot);
 
-            if (!user) {
-                return;
-            }
+    let hideTimer;
+    function showNav(ms = 1800) {
+      navBar.classList.remove('nav-hidden');
+      navBar.classList.add('nav-visible');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideNav, ms);
+    }
+    function hideNav() {
+      navBar.classList.add('nav-hidden');
+      navBar.classList.remove('nav-visible');
+    }
 
-            // Logged in
-            loginSection.classList.add('hidden');
-            mainContent.classList.remove('hidden');
-            navButtons.classList.remove('hidden');
+    // Ẩn mặc định
+    hideNav();
 
-            const email = user.email;
-            const isAdmin = email === ADMIN_EMAIL;
-            
-            // Update status text
-            // dùng displayName thay vì nguyên email
-    status.textContent = `Tài khoản: ${displayName(email)}\nVai trò: ${isAdmin ? "Admin" : "Người dùng"}`;
-            
-            // Show buttons based on user role
-            if (isAdmin) {
-                showCreateUserModalBtn.classList.remove('hidden');
-                addProjectBtn.classList.remove('hidden');
-            } else {
-                showCreateUserModalBtn.classList.add('hidden');
-                addProjectBtn.classList.add('hidden');
-            }
-        });
-    </script>
-   <script type="module" src="addproject.js"></script>
-    <script type="module" src="tasks.js"></script>
+    // Rê chuột sát mép trên → hiện
+    hot.addEventListener('mouseenter', () => showNav());
+    // Giữ hiện khi đang ở trong nav
+    navBar.addEventListener('mouseenter', () => showNav(3000));
+    // Rời nav → ẩn lại
+    navBar.addEventListener('mouseleave', hideNav);
+  </script>
+
+  <!-- Modules -->
+  <script type="module" src="addproject.js"></script>
+  <script type="module" src="tasks.js"></script>
 </body>
 </html>
-
-
-
-
-
-
-
