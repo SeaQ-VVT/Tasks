@@ -8,7 +8,10 @@ import {
     doc,
     updateDoc,
     deleteDoc,
-    orderBy
+    orderBy,
+    where,
+    getDocs,
+    deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -99,12 +102,12 @@ function setupProjectListener() {
     const q = query(projectsCol, orderBy("createdAt", "desc"));
 
     onSnapshot(q, (snapshot) => {
-        projectArea.innerHTML = ""; // Xóa danh sách cũ
+        projectArea.innerHTML = ""; // Clear the old list
         snapshot.forEach((doc) => {
             renderProject(doc);
         });
 
-        // Thêm sự kiện cho các nút
+        // Add event listeners for the buttons
         document.querySelectorAll(".edit-btn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 const id = e.target.dataset.id;
@@ -128,7 +131,7 @@ function setupProjectListener() {
                 const docToView = snapshot.docs.find((d) => d.id === id);
                 if (docToView) {
                     const projectTitle = docToView.data().title;
-                    console.log("Xem công việc cho project:", id);
+                    console.log("Viewing tasks for project:", id);
                     showTaskBoard(id, projectTitle); 
                 }
             });
@@ -144,7 +147,8 @@ saveProjectBtn.addEventListener("click", async () => {
     const comment = projectCommentInput.value.trim();
 
     if (!title) {
-        alert("Vui lòng nhập tên dự án.");
+        // Use a more friendly UI instead of alert
+        console.error("Please enter a project title.");
         return;
     }
 
@@ -200,7 +204,7 @@ function editProject(id, data) {
     showModal("projectModal");
 }
 
-// ===== Delete project =====
+// ===== Delete project and associated data =====
 function showDeleteConfirmation(id) {
     currentProjectId = id;
     showModal("deleteModal");
@@ -208,10 +212,30 @@ function showDeleteConfirmation(id) {
 
 confirmDeleteBtn.addEventListener("click", async () => {
     try {
+        // Find and delete all tasks associated with the project
+        const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasksToDelete = tasksSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(tasksToDelete);
+
+        // Find and delete all groups associated with the project
+        const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
+        const groupsSnapshot = await getDocs(groupsQuery);
+        const groupsToDelete = groupsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(groupsToDelete);
+
+        // Find and delete all logs associated with the project
+        const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
+        const logsSnapshot = await getDocs(logsQuery);
+        const logsToDelete = logsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(logsToDelete);
+        
+        // Finally, delete the project document itself
         await deleteDoc(doc(db, "projects", currentProjectId));
+
         hideModal("deleteModal");
     } catch (e) {
-        console.error("Error deleting project: ", e);
+        console.error("Error deleting project and associated data: ", e);
     }
 });
 
@@ -240,4 +264,3 @@ auth.onAuthStateChanged((user) => {
         addProjectBtn.classList.add("hidden");
     }
 });
-
