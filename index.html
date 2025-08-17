@@ -11,20 +11,21 @@
     body { font-family: 'Inter', sans-serif; }
 
     /* Nav bar */
-    .nav-bar {
-      background-color: #334155;
-      color: white;
-      padding: 1rem 2rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border-radius: 0.75rem;
-      box-shadow: 0 4px 6px rgba(0,0,0,.1);
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 1000;
-      transition: transform .25s ease, opacity .25s ease;
-    }
+.nav-bar {
+  background-color: #334155;
+  color: white;
+  padding: 0.35rem 1rem;   /* nhỏ hơn nhiều, nav thấp gọn */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 0.5rem;   /* bo gọn hơn */
+  box-shadow: 0 2px 4px rgba(0,0,0,.08);
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  transition: transform .25s ease, opacity .25s ease;
+  font-size: 0.85rem;      /* thu nhỏ chữ */
+}
     /* Auto-hide */
     .nav-hidden { transform: translateY(-95%); opacity: 0; }
     .nav-visible { transform: translateY(0); opacity: 1; }
@@ -359,3 +360,4 @@
   <script type="module" src="tasks.js"></script>
 </body>
 </html>
+
