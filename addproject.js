@@ -353,21 +353,6 @@ if (confirmCopyBtn) {
         })
       );
 
-      // 4) Copy LOGS (remap projectId)
-      const logsQ = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
-      const logsSnap = await getDocs(logsQ);
-      await Promise.all(
-        logsSnap.docs.map((lg) => {
-          const lgData = lg.data();
-          const { createdAt, updatedAt, projectId, ...lgRest } = lgData;
-          return addDoc(collection(db, "logs"), {
-            ...lgRest,
-            projectId: newProjectId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp()
-          });
-        })
-      );
 
       hideModal("copyModal");
       console.log("Đã sao chép dự án và toàn bộ dữ liệu liên quan thành công!");
@@ -444,3 +429,4 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
+
