@@ -2,255 +2,480 @@
 import {
     getFirestore,
     collection,
-    query,
-    onSnapshot,
     addDoc,
+    query,
+    where,
+    onSnapshot,
     doc,
-    updateDoc,
     deleteDoc,
+    updateDoc,
+    serverTimestamp,
     getDocs,
-    where
+    deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { showTaskBoard } from "./tasks.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
-// Debug log
-console.log("addproject.js loaded OK");
-
-// ===== Firebase config (Auto-provided by Canvas) =====
-const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+// ===== Firebase Config =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+  authDomain: "task-manager-d18aa.firebaseapp.com",
+  projectId: "task-manager-d18aa",
+  storageBucket: "task-manager-d18aa.appspot.com",
+  messagingSenderId: "1080268498085",
+  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
+};
 
 // ===== Init Firebase =====
-let app, db, auth;
-let currentProjectId = null;
-let isEditing = false;
-let projectsUnsubscribe = null;
-
-// DOM elements
-const projectList = document.getElementById("projectList");
-const addProjectBtn = document.getElementById("addProjectBtn");
-const projectModal = document.getElementById("projectModal");
-const deleteModal = document.getElementById("deleteModal");
-const projectModalTitle = document.getElementById("projectModalTitle");
-const projectTitleInput = document.getElementById("projectTitle");
-const projectDescriptionInput = document.getElementById("projectDescription");
-const projectStartInput = document.getElementById("projectStartDate");
-const projectEndInput = document.getElementById("projectEndDate");
-const projectCommentInput = document.getElementById("projectComment");
-const saveProjectBtn = document.getElementById("saveProjectBtn");
-const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
-const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
-const cancelProjectBtn = document.getElementById("cancelProjectBtn");
-
-// Initialize Firebase and Auth
-async function initFirebase() {
-    try {
-        // Prevent multiple app initializations
-        if (!getApps().length) {
-            app = initializeApp(firebaseConfig);
-        } else {
-            app = getApps()[0];
-        }
-        db = getFirestore(app);
-        auth = getAuth(app);
-        
-        // Listen for auth state changes to handle UI and data loading
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                console.log("User is authenticated:", user.uid);
-                addProjectBtn.classList.remove("hidden");
-                listenForProjects();
-            } else {
-                console.log("User is not authenticated. Signing in anonymously...");
-                // Attempt to sign in anonymously if not already signed in
-                if (!auth.currentUser) {
-                    try {
-                        await signInAnonymously(auth);
-                    } catch (e) {
-                        console.error("Error signing in anonymously: ", e);
-                    }
-                }
-                addProjectBtn.classList.add("hidden");
-                // Stop listening for projects if user logs out
-                if (projectsUnsubscribe) {
-                    projectsUnsubscribe();
-                    projectsUnsubscribe = null;
-                }
-                projectList.innerHTML = "<li>Vui lòng đăng nhập để xem dự án.</li>";
-            }
-        });
-        
-        // Use custom token if available and no user is currently signed in
-        if (initialAuthToken && !auth.currentUser) {
-            await signInWithCustomToken(auth, initialAuthToken);
-        }
-
-    } catch (e) {
-        console.error("Error initializing Firebase: ", e);
-    }
-}
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 // ===== Modal helper =====
-function showModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.remove("hidden");
-    }
-}
-
-function hideModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) {
-        modal.classList.add("hidden");
-    }
-}
-
-// ===== Firestore functions =====
-function listenForProjects() {
-    const projectsCol = collection(db, "projects");
-    const q = query(projectsCol); // You can add orderBy here if needed
-
-    // Unsubscribe from previous listener if it exists
-    if (projectsUnsubscribe) {
-        projectsUnsubscribe();
+function openModal(title, fields, onSave) {
+    let modal = document.getElementById("popupModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "popupModal";
+        modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden";
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-4 w-96">
+                <h3 id="modalTitle" class="font-semibold mb-2"></h3>
+                <div id="modalFields" class="space-y-2"></div>
+                <div class="flex justify-end space-x-2 mt-3">
+                    <button id="modalCancel" class="px-3 py-1 bg-gray-200 rounded">Hủy</button>
+                    <button id="modalSave" class="px-3 py-1 bg-green-500 text-white rounded">Lưu</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 
-    projectsUnsubscribe = onSnapshot(q, (snapshot) => {
-        projectList.innerHTML = "";
-        if (snapshot.empty) {
-            projectList.innerHTML = "<li>Không có dự án nào. Vui lòng thêm một dự án mới.</li>";
+    document.getElementById("modalTitle").textContent = title;
+    const fieldsDiv = document.getElementById("modalFields");
+    fieldsDiv.innerHTML = "";
+    fields.forEach(f => {
+        if (f.type === "textarea") {
+            fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" class="border p-2 w-full">${f.value || ""}</textarea>`;
+        } else if (f.type === "color") {
+            fieldsDiv.innerHTML += `
+                <div class="flex items-center space-x-2">
+                    <label for="${f.id}" class="text-gray-700 w-20">${f.label}:</label>
+                    <input id="${f.id}" type="color" class="border p-1 w-full" value="${f.value || "#000000"}">
+                </div>
+            `;
+        } else {
+            fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full" value="${f.value || ""}">`;
         }
+    });
+
+    modal.classList.remove("hidden");
+
+    document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
+    document.getElementById("modalSave").onclick = () => {
+        const values = {};
+        fields.forEach(f => values[f.id] = document.getElementById(f.id).value);
+        onSave(values);
+        modal.classList.add("hidden");
+    };
+}
+
+// ===== Get user display name from email =====
+function getUserDisplayName(email) {
+    if (!email) return "Ẩn danh";
+    return email.split('@')[0];
+}
+
+// ===== Show Toast Notification =====
+function showToast(message) {
+    let toastContainer = document.getElementById("toastContainer");
+    if (!toastContainer) {
+        toastContainer = document.createElement("div");
+        toastContainer.id = "toastContainer";
+        toastContainer.className = "fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-2";
+        document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl animate-fade-in-up transition-opacity duration-500 ease-in-out";
+    toast.textContent = message;
+
+    // Add CSS for fade-in animation
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes fadeInUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+
+    toastContainer.appendChild(toast);
+
+    // Fade out and remove after 5 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 5000);
+}
+
+// ===== LOGGING FUNCTION =====
+async function logAction(projectId, action) {
+    const user = auth.currentUser?.email || "Ẩn danh";
+    await addDoc(collection(db, "logs"), {
+        projectId,
+        action,
+        user,
+        timestamp: serverTimestamp()
+    });
+}
+
+// ===== LISTEN AND DISPLAY LOGS FUNCTION =====
+function listenForLogs(projectId) {
+    const logsCol = collection(db, "logs");
+    const q = query(logsCol, where("projectId", "==", projectId));
+
+    onSnapshot(q, (snapshot) => {
+        const logEntries = document.getElementById("logEntries");
+        if (!logEntries) return;
+        
+        // Cập nhật nhật ký hoạt động
+        const logs = [];
         snapshot.forEach((doc) => {
-            renderProject(doc);
+            logs.push(doc.data());
+        });
+
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        logEntries.innerHTML = "";
+        logs.forEach((data) => {
+            const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+            const userDisplayName = getUserDisplayName(data.user);
+            const logItem = document.createElement("div");
+            logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
+            logEntries.appendChild(logItem);
+        });
+
+        // Hiển thị thông báo nhỏ cho các thay đổi mới
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const userDisplayName = getUserDisplayName(data.user);
+                showToast(`${userDisplayName} đã ${data.action}.`);
+            }
         });
     });
 }
 
-function renderProject(doc) {
-    const project = doc.data();
-    const li = document.createElement("li");
-    li.className = "p-4 bg-white rounded shadow-md mb-2 flex justify-between items-center";
-    li.innerHTML = `
-        <div>
-            <h3 class="font-bold text-lg text-blue-600">${project.title}</h3>
-            <p class="text-sm text-gray-600">${project.description}</p>
+// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA AND TOGGLE BUTTON) =====
+export function showTaskBoard(projectId, projectTitle) {
+    const taskBoard = document.getElementById("taskBoard");
+
+    taskBoard.innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Bạn đang ở dự án: ${projectTitle}</h2>
+        
+        <div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
+                <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs">Hiện log</button>
+            </div>
+            <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
         </div>
-        <div class="flex items-center space-x-2">
-            <button class="view-btn bg-blue-500 text-white px-2 py-1 rounded text-xs" data-id="${doc.id}">Xem</button>
-            <button class="edit-btn bg-yellow-500 text-white px-2 py-1 rounded text-xs" data-id="${doc.id}">Sửa</button>
-            <button class="delete-btn bg-red-500 text-white px-2 py-1 rounded text-xs" data-id="${doc.id}">Xóa</button>
+
+        <div class="grid grid-cols-3 gap-4 w-full mt-4">
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
+                <h3 class="font-bold text-red-600 mb-2">To Do</h3>
+                <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">+ Group</button>
+                <div id="groupContainer" class="space-y-3 mt-2"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
+                <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
+                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+                <h3 class="font-bold text-green-600 mb-2">Done</h3>
+                <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
         </div>
     `;
-    projectList.appendChild(li);
 
-    // Add event listeners for buttons
-    li.querySelector(".view-btn").addEventListener("click", () => {
-        showTaskBoard(doc.id, project.title);
-    });
-    li.querySelector(".edit-btn").addEventListener("click", () => {
-        editProject(doc.id, project);
-    });
-    li.querySelector(".delete-btn").addEventListener("click", () => {
-        showDeleteConfirmation(doc.id);
-    });
-}
-
-// ===== CRUD operations =====
-async function saveProject() {
-    const projectData = {
-        title: projectTitleInput.value,
-        description: projectDescriptionInput.value,
-        startDate: projectStartInput.value,
-        endDate: projectEndInput.value,
-        comment: projectCommentInput.value
-    };
-
-    try {
-        if (isEditing) {
-            await updateDoc(doc(db, "projects", currentProjectId), projectData);
+    // Add event listener for the log toggle button
+    document.getElementById("toggleLogBtn").addEventListener("click", () => {
+        const logEntries = document.getElementById("logEntries");
+        const button = document.getElementById("toggleLogBtn");
+        if (logEntries.classList.contains("hidden")) {
+            logEntries.classList.remove("hidden");
+            button.textContent = "Ẩn log";
         } else {
-            await addDoc(collection(db, "projects"), projectData);
+            logEntries.classList.add("hidden");
+            button.textContent = "Hiện log";
         }
-        hideModal("projectModal");
-    } catch (e) {
-        console.error("Error saving project: ", e);
-    }
+    });
+
+    loadGroups(projectId);
+    setupGroupListeners(projectId);
+    setupDragDrop();
+    listenForLogs(projectId);
 }
 
-function editProject(id, data) {
-    isEditing = true;
-    currentProjectId = id;
-    projectModalTitle.textContent = "Sửa dự án";
-    projectTitleInput.value = data.title || "";
-    projectDescriptionInput.value = data.description || "";
-    projectStartInput.value = data.startDate || "";
-    projectEndInput.value = data.endDate || "";
-    projectCommentInput.value = data.comment || "";
+// ===== Load Groups realtime =====
+function loadGroups(projectId) {
+    const groupsCol = collection(db, "groups");
+    const q = query(groupsCol, where("projectId", "==", projectId));
 
-    showModal("projectModal");
+    onSnapshot(q, (snapshot) => {
+        const groupContainer = document.getElementById("groupContainer");
+        groupContainer.innerHTML = "";
+        snapshot.forEach((docSnap) => renderGroup(docSnap));
+    });
 }
 
-// ===== Delete project (UPDATED to delete related data) =====
-function showDeleteConfirmation(id) {
-    currentProjectId = id;
-    showModal("deleteModal");
+// ===== Render Group =====
+function renderGroup(docSnap) {
+    const g = docSnap.data();
+    const gid = docSnap.id;
+
+    const div = document.createElement("div");
+    div.className = "border rounded p-2 bg-gray-50 shadow";
+    div.id = `group-${gid}`;
+
+    div.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span class="font-semibold text-blue-700">${g.title}</span>
+            <div class="space-x-1">
+                <button class="edit-group text-yellow-600">✏️</button>
+                <button class="delete-group text-red-600">🗑️</button>
+            </div>
+        </div>
+        <button class="add-task text-green-600 text-xs mt-1">+ Task</button>
+        <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
+    `;
+
+    document.getElementById("groupContainer").appendChild(div);
+
+    loadTasks(gid);
+
+    div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
+    div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
+    div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
-confirmDeleteBtn.addEventListener("click", async () => {
-    try {
-        if (currentProjectId) {
-            // Step 1: Find and delete all tasks for this project
-            const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
-            const tasksSnapshot = await getDocs(tasksQuery);
-            const tasksToDelete = tasksSnapshot.docs.map(d => deleteDoc(doc(db, "tasks", d.id)));
-            await Promise.all(tasksToDelete);
-            console.log(`Deleted ${tasksToDelete.length} tasks.`);
+// ===== Load tasks realtime with docChanges() (FIXED) =====
+function loadTasks(groupId) {
+    const tasksCol = collection(db, "tasks");
+    const q = query(tasksCol, where("groupId", "==", groupId));
 
-            // Step 2: Find and delete all groups for this project
-            const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
-            const groupsSnapshot = await getDocs(groupsQuery);
-            const groupsToDelete = groupsSnapshot.docs.map(d => deleteDoc(doc(db, "groups", d.id)));
-            await Promise.all(groupsToDelete);
-            console.log(`Deleted ${groupsToDelete.length} groups.`);
+    onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const docSnap = change.doc;
+            const tid = docSnap.id;
             
-            // Step 3: Delete the project document itself
-            await deleteDoc(doc(db, "projects", currentProjectId));
-            console.log(`Deleted project: ${currentProjectId}`);
-        }
+            // Xóa element cũ nếu đã tồn tại để tránh trùng lặp
+            const oldElement = document.getElementById(`task-${tid}`);
+            if (oldElement) {
+                oldElement.remove();
+            }
+
+            if (change.type === "added" || change.type === "modified") {
+                // Thêm hoặc cập nhật task mới vào đúng vị trí
+                renderTask(docSnap);
+            } else if (change.type === "removed") {
+                // Xử lý khi task bị xóa
+                // Đã xử lý ở trên
+            }
+        });
+    });
+}
+
+// ===== Render task row =====
+function renderTask(docSnap) {
+    const t = docSnap.data();
+    const tid = docSnap.id;
+
+    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    const col = document.getElementById(colId);
+    if (!col) return;
+
+    // Check if the element already exists to avoid duplication
+    let row = document.getElementById(`task-${tid}`);
+    if (!row) {
+        row = document.createElement("div");
+        row.id = `task-${tid}`;
+        row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
+        row.style.borderLeft = `4px solid ${t.color || '#e5e7eb'}`;
+        row.draggable = true;
+
+        row.innerHTML = `
+            <span class="truncate">${t.title}</span>
+            <div class="space-x-1">
+                <button class="edit-task">✏️</button>
+                <button class="comment-task">💬</button>
+                <button class="delete-task">🗑️</button>
+            </div>
+        `;
         
-        hideModal("deleteModal");
-    } catch (e) {
-        console.error("Error deleting project and related data: ", e);
+        // Append the new row to the correct column
+        col.appendChild(row);
+
+        // Add event listeners only once
+        row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("type", "task");
+            e.dataTransfer.setData("taskId", tid);
+            e.dataTransfer.setData("groupId", t.groupId);
+        });
+
+        row.querySelector(".edit-task").addEventListener("click", () => {
+            openModal("Edit Task", [
+                { id: "title", placeholder: "Task title", type: "text", value: t.title },
+                { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
+            ], async (vals) => {
+                const oldTitle = t.title;
+                await updateDoc(doc(db, "tasks", tid), {
+                    title: vals.title,
+                    color: vals.color,
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
+                await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+            });
+        });
+
+        row.querySelector(".comment-task").addEventListener("click", () => {
+            openModal("Comment Task", [
+                { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+            ], async (vals) => {
+                if (vals.comment && vals.comment.trim().length > 0) {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: vals.comment.trim(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
+                } else {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: deleteField(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+                }
+            });
+        });
+
+        row.querySelector(".delete-task").addEventListener("click", async () => {
+            if (confirm("Xóa task này?")) {
+                await deleteDoc(doc(db, "tasks", tid));
+                await logAction(t.projectId, `xóa task "${t.title}"`);
+            }
+        });
     }
-});
 
-cancelDeleteBtn.addEventListener("click", () => hideModal("deleteModal"));
-cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
+    // Luôn cập nhật trạng thái màu sắc của icon comment
+    const hasComment = t.comment && t.comment.trim().length > 0;
+    const commentBtn = row.querySelector(".comment-task");
+    if (hasComment) {
+        commentBtn.classList.remove("text-gray-400");
+        commentBtn.classList.add("text-blue-600", "font-bold");
+    } else {
+        commentBtn.classList.remove("text-blue-600", "font-bold");
+        commentBtn.classList.add("text-gray-400");
+    }
+}
 
-// ===== Add project modal =====
-addProjectBtn.addEventListener("click", () => {
-    isEditing = false;
-    projectModalTitle.textContent = "Tạo dự án mới";
-    projectTitleInput.value = "";
-    projectDescriptionInput.value = "";
-    projectStartInput.value = "";
-    projectEndInput.value = "";
-    projectCommentInput.value = "";
-    showModal("projectModal");
-});
+
+// MODIFIED TO ADD LOGGING AND COLOR
+async function addGroup(projectId) {
+    openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
+        await addDoc(collection(db, "groups"), {
+            title: vals.title, projectId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm group mới "${vals.title}"`);
+    });
+}
+
+async function editGroup(groupId, g) {
+    openModal("Sửa Group", [{ id: "title", placeholder: "Tên", value: g.title }], async (vals) => {
+        await updateDoc(doc(db, "groups", groupId), {
+            title: vals.title, updatedAt: serverTimestamp(),
+            updatedBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(g.projectId, `cập nhật group "${g.title}" thành "${vals.title}"`);
+    });
+}
+
+async function deleteGroup(groupId, g) {
+    if (!confirm("Xóa group này và tất cả task bên trong?")) return;
+
+    const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
+    const tasksToDelete = taskSnap.docs.map(t => t.id);
+    await logAction(g.projectId, `xóa group "${g.title}" và ${tasksToDelete.length} task bên trong`);
+
+    taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
+    await deleteDoc(doc(db, "groups", groupId));
+}
+
+// MODIFIED TO ADD COLOR
+function openTaskModal(groupId, projectId) {
+    openModal("Thêm Task", [
+        { id: "title", placeholder: "Tên Task" },
+        { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" },
+        { id: "color", label: "Màu", type: "color" }
+    ], async (vals) => {
+        await addDoc(collection(db, "tasks"), {
+            title: vals.title, comment: vals.comment || "", color: vals.color || null,
+            projectId, groupId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm task mới "${vals.title}" vào group`);
+    });
+}
+
+// MODIFIED TO ADD LOGGING
+function setupDragDrop() {
+    ["inprogressCol", "doneCol"].forEach((colId) => {
+        const col = document.getElementById(colId);
+        if (!col) return;
+
+        col.addEventListener("dragover", (e) => e.preventDefault());
+
+        col.addEventListener("drop", async (e) => {
+            e.preventDefault();
+
+            const type = e.dataTransfer.getData("type");
+            if (type !== "task") return;
+
+            const taskId = e.dataTransfer.getData("taskId");
+            if (!taskId) return;
+
+            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+            
+            // Fixed the query to get the document by ID.
+            const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
+            if (taskDoc.empty) return;
+            const taskData = taskDoc.docs[0].data();
+
+            await updateDoc(doc(db, "tasks", taskId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+
+            await logAction(taskData.projectId, `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`);
+        });
+    });
+}
 
 // ===== Listeners =====
-saveProjectBtn.addEventListener("click", saveProject);
-projectModal.addEventListener("click", (e) => {
-    if (e.target === projectModal) hideModal("projectModal");
-});
-deleteModal.addEventListener("click", (e) => {
-    if (e.target === deleteModal) hideModal("deleteModal");
-});
-
-// Initialize the app
-initFirebase();
-
+function setupGroupListeners(projectId) {
+    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
+}
