@@ -12,7 +12,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-// Thêm import showTaskBoard
 import { showTaskBoard } from "./tasks.js";
 
 // Debug log
@@ -123,7 +122,6 @@ function setupProjectListener() {
             });
         });
 
-        // Sửa đoạn code này để truyền tên dự án
         document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
             btn.addEventListener("click", (e) => {
                 const id = e.target.dataset.id;
@@ -131,7 +129,7 @@ function setupProjectListener() {
                 if (docToView) {
                     const projectTitle = docToView.data().title;
                     console.log("Xem công việc cho project:", id);
-                    showTaskBoard(id, projectTitle); // Truyền thêm tiêu đề
+                    showTaskBoard(id, projectTitle); 
                 }
             });
         });
@@ -175,7 +173,6 @@ saveProjectBtn.addEventListener("click", async () => {
             });
         }
 
-        // Reset & close modal
         hideModal("projectModal");
         projectTitleInput.value = "";
         projectDescriptionInput.value = "";
