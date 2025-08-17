@@ -31,7 +31,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== Modal helper (UPDATED) =====
+// ===== Modal helper =====
 function openModal(title, fields, onSave) {
     let modal = document.getElementById("popupModal");
     if (!modal) {
@@ -79,7 +79,6 @@ function openModal(title, fields, onSave) {
 
     modal.classList.remove("hidden");
     
-    // Add listener for range input
     const progressInput = document.getElementById("progress");
     if (progressInput) {
         const progressValueSpan = document.getElementById("progress-value");
@@ -87,7 +86,6 @@ function openModal(title, fields, onSave) {
             progressValueSpan.textContent = e.target.value;
         });
     }
-
 
     document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
     document.getElementById("modalSave").onclick = () => {
@@ -104,7 +102,7 @@ function getUserDisplayName(email) {
     return email.split('@')[0];
 }
 
-// ===== Show Toast Notification =====
+// ===== Toast =====
 function showToast(message) {
     let toastContainer = document.getElementById("toastContainer");
     if (!toastContainer) {
@@ -118,28 +116,17 @@ function showToast(message) {
     toast.className = "bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl animate-fade-in-up transition-opacity duration-500 ease-in-out";
     toast.textContent = message;
 
-    // Add CSS for fade-in animation
     const style = document.createElement("style");
     style.innerHTML = `
       @keyframes fadeInUp {
-        from {
-          transform: translateY(20px);
-          opacity: 0;
-        }
-        to {
-          transform: translateY(0);
-          opacity: 1;
-        }
+        from { transform: translateY(20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
       }
-      .animate-fade-in-up {
-        animation: fadeInUp 0.5s ease-in-out;
-      }
+      .animate-fade-in-up { animation: fadeInUp 0.5s ease-in-out; }
     `;
     document.head.appendChild(style);
 
     toastContainer.appendChild(toast);
-
-    // Fade out and remove after 5 seconds
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 500);
@@ -166,12 +153,8 @@ function listenForLogs(projectId) {
         const logEntries = document.getElementById("logEntries");
         if (!logEntries) return;
         
-        // Cập nhật nhật ký hoạt động
         const logs = [];
-        snapshot.forEach((doc) => {
-            logs.push(doc.data());
-        });
-
+        snapshot.forEach((doc) => logs.push(doc.data()));
         logs.sort((a, b) => b.timestamp - a.timestamp);
         
         logEntries.innerHTML = "";
@@ -183,7 +166,6 @@ function listenForLogs(projectId) {
             logEntries.appendChild(logItem);
         });
 
-        // Hiển thị thông báo nhỏ cho các thay đổi mới
         snapshot.docChanges().forEach((change) => {
             if (change.type === "added") {
                 const data = change.doc.data();
@@ -194,7 +176,7 @@ function listenForLogs(projectId) {
     });
 }
 
-// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA AND TOGGLE BUTTON) =====
+// ===== RENDER TASK BOARD =====
 export function showTaskBoard(projectId, projectTitle) {
     const taskBoard = document.getElementById("taskBoard");
 
@@ -217,16 +199,15 @@ export function showTaskBoard(projectId, projectTitle) {
             </div>
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
                 <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
-                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+                <div id="inprogressCol" class="space-y-3 mt-2 min-h-[200px]"></div>
             </div>
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
                 <h3 class="font-bold text-green-600 mb-2">Done</h3>
-                <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+                <div id="doneCol" class="space-y-3 mt-2 min-h-[200px]"></div>
             </div>
         </div>
     `;
 
-    // Add event listener for the log toggle button
     document.getElementById("toggleLogBtn").addEventListener("click", () => {
         const logEntries = document.getElementById("logEntries");
         const button = document.getElementById("toggleLogBtn");
@@ -245,19 +226,54 @@ export function showTaskBoard(projectId, projectTitle) {
     listenForLogs(projectId);
 }
 
-// ===== Load Groups realtime =====
+// ===== Load Groups realtime (TẠO SECTION CHO 3 CỘT) =====
 function loadGroups(projectId) {
     const groupsCol = collection(db, "groups");
-    const q = query(groupsCol, where("projectId", "==", projectId));
+    const qGroups = query(groupsCol, where("projectId", "==", projectId));
 
-    onSnapshot(q, (snapshot) => {
+    onSnapshot(qGroups, (snapshot) => {
         const groupContainer = document.getElementById("groupContainer");
+        const inprogressCol = document.getElementById("inprogressCol");
+        const doneCol = document.getElementById("doneCol");
+
+        // Clear cả 3 khu
         groupContainer.innerHTML = "";
-        snapshot.forEach((docSnap) => renderGroup(docSnap));
+        inprogressCol.innerHTML = "";
+        doneCol.innerHTML = "";
+
+        snapshot.forEach((docSnap) => {
+            const gid = docSnap.id;
+            const g = docSnap.data();
+
+            // 1) Tạo section group ở IN PROGRESS
+            const ipSection = document.createElement("div");
+            ipSection.className = "border rounded p-2 bg-gray-50 shadow";
+            ipSection.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-yellow-700">${g.title}</span>
+                </div>
+                <div id="inprogress-${gid}" class="space-y-1 mt-2"></div>
+            `;
+            inprogressCol.appendChild(ipSection);
+
+            // 2) Tạo section group ở DONE
+            const doneSection = document.createElement("div");
+            doneSection.className = "border rounded p-2 bg-gray-50 shadow";
+            doneSection.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-semibold text-green-700">${g.title}</span>
+                </div>
+                <div id="done-${gid}" class="space-y-1 mt-2"></div>
+            `;
+            doneCol.appendChild(doneSection);
+
+            // 3) Render group ở TO DO (gọi sau để đảm bảo containers đã có)
+            renderGroup(docSnap);
+        });
     });
 }
 
-// ===== Render Group =====
+// ===== Render Group (TO DO) =====
 function renderGroup(docSnap) {
     const g = docSnap.data();
     const gid = docSnap.id;
@@ -287,43 +303,42 @@ function renderGroup(docSnap) {
     div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
-// ===== Load tasks realtime with docChanges() (FIXED) =====
+// ===== Load tasks realtime (theo group) =====
 function loadTasks(groupId) {
     const tasksCol = collection(db, "tasks");
-    const q = query(tasksCol, where("groupId", "==", groupId));
+    const qTasks = query(tasksCol, where("groupId", "==", groupId));
 
-    onSnapshot(q, (snapshot) => {
+    onSnapshot(qTasks, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
             const docSnap = change.doc;
             const tid = docSnap.id;
             
             // Xóa element cũ nếu đã tồn tại để tránh trùng lặp
             const oldElement = document.getElementById(`task-${tid}`);
-            if (oldElement) {
-                oldElement.remove();
-            }
+            if (oldElement) oldElement.remove();
 
             if (change.type === "added" || change.type === "modified") {
-                // Thêm hoặc cập nhật task mới vào đúng vị trí
                 renderTask(docSnap);
-            } else if (change.type === "removed") {
-                // Xử lý khi task bị xóa
-                // Đã xử lý ở trên
             }
+            // removed -> đã remove ở trên
         });
     });
 }
 
-// ===== Render task row (UPDATED) =====
+// ===== Render task row (MAP THEO GROUP Ở MỖI CỘT) =====
 function renderTask(docSnap) {
     const t = docSnap.data();
     const tid = docSnap.id;
 
-    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    // Map đúng container theo status + groupId
+    let colId;
+    if (t.status === "todo") colId = `tasks-${t.groupId}`;
+    else if (t.status === "inprogress") colId = `inprogress-${t.groupId}`;
+    else if (t.status === "done") colId = `done-${t.groupId}`;
+
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // Check if the element already exists to avoid duplication
     let row = document.getElementById(`task-${tid}`);
     if (!row) {
         row = document.createElement("div");
@@ -346,10 +361,8 @@ function renderTask(docSnap) {
             </div>
         `;
         
-        // Append the new row to the correct column
         col.appendChild(row);
 
-        // Add event listeners only once
         row.addEventListener("dragstart", (e) => {
             e.dataTransfer.setData("type", "task");
             e.dataTransfer.setData("taskId", tid);
@@ -377,7 +390,7 @@ function renderTask(docSnap) {
                     await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
                 }
                 if (oldProgress !== parseInt(vals.progress)) {
-                     await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
+                    await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
                 }
             });
         });
@@ -412,7 +425,6 @@ function renderTask(docSnap) {
         });
     }
 
-    // Luôn cập nhật trạng thái màu sắc của icon comment
     const hasComment = t.comment && t.comment.trim().length > 0;
     const commentBtn = row.querySelector(".comment-task");
     if (hasComment) {
@@ -423,15 +435,13 @@ function renderTask(docSnap) {
         commentBtn.classList.add("text-gray-400");
     }
 
-    // Update progress bar
     const progressBar = row.querySelector(`#progress-container-${tid} div`);
     if (progressBar) {
         progressBar.style.width = `${t.progress || 0}%`;
     }
 }
 
-
-// MODIFIED TO ADD LOGGING AND COLOR
+// ===== Group CRUD =====
 async function addGroup(projectId) {
     openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
         await addDoc(collection(db, "groups"), {
@@ -463,7 +473,7 @@ async function deleteGroup(groupId, g) {
     await deleteDoc(doc(db, "groups", groupId));
 }
 
-// MODIFIED TO ADD COLOR
+// ===== Task add =====
 function openTaskModal(groupId, projectId) {
     openModal("Thêm Task", [
         { id: "title", placeholder: "Tên Task" },
@@ -480,7 +490,7 @@ function openTaskModal(groupId, projectId) {
     });
 }
 
-// MODIFIED TO ADD LOGGING
+// ===== Drag & Drop (đổi status, group giữ nguyên) =====
 function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
@@ -499,7 +509,6 @@ function setupDragDrop() {
 
             const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
             
-            // Fixed the query to get the document by ID.
             const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
             if (taskDoc.empty) return;
             const taskData = taskDoc.docs[0].data();
