@@ -269,20 +269,29 @@ function renderGroup(docSnap) {
     div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
-// ===== Load tasks realtime (improved) =====
+// ===== Load tasks realtime with docChanges() (FIXED) =====
 function loadTasks(groupId) {
     const tasksCol = collection(db, "tasks");
     const q = query(tasksCol, where("groupId", "==", groupId));
 
     onSnapshot(q, (snapshot) => {
-        // Clear the container first to avoid duplicates
-        const container = document.getElementById(`tasks-${groupId}`);
-        if (container) {
-            container.innerHTML = '';
-        }
+        snapshot.docChanges().forEach((change) => {
+            const docSnap = change.doc;
+            const tid = docSnap.id;
+            
+            // Xóa element cũ nếu đã tồn tại để tránh trùng lặp
+            const oldElement = document.getElementById(`task-${tid}`);
+            if (oldElement) {
+                oldElement.remove();
+            }
 
-        snapshot.forEach((docSnap) => {
-            renderTask(docSnap);
+            if (change.type === "added" || change.type === "modified") {
+                // Thêm hoặc cập nhật task mới vào đúng vị trí
+                renderTask(docSnap);
+            } else if (change.type === "removed") {
+                // Xử lý khi task bị xóa
+                // Đã xử lý ở trên
+            }
         });
     });
 }
@@ -296,83 +305,90 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    const old = document.getElementById(`task-${tid}`);
-    if (old) old.remove();
+    // Check if the element already exists to avoid duplication
+    let row = document.getElementById(`task-${tid}`);
+    if (!row) {
+        row = document.createElement("div");
+        row.id = `task-${tid}`;
+        row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
+        row.style.borderLeft = `4px solid ${t.color || '#e5e7eb'}`;
+        row.draggable = true;
 
-    // Sửa lỗi kiểm tra comment để icon đổi màu đúng
-    const hasComment = t.comment && t.comment.trim().length > 0;
-    const borderColor = t.color || '#e5e7eb'; // Default to gray-200 if no color is set
+        row.innerHTML = `
+            <span class="truncate">${t.title}</span>
+            <div class="space-x-1">
+                <button class="edit-task">✏️</button>
+                <button class="comment-task">💬</button>
+                <button class="delete-task">🗑️</button>
+            </div>
+        `;
+        
+        // Append the new row to the correct column
+        col.appendChild(row);
 
-    const row = document.createElement("div");
-    row.id = `task-${tid}`;
-    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
-    row.style.borderLeft = `4px solid ${borderColor}`;
-    row.draggable = true;
-
-    row.innerHTML = `
-        <span class="truncate">${t.title}</span>
-        <div class="space-x-1">
-            <button class="edit-task">✏️</button>
-            <button class="comment-task ${hasComment ? 'text-blue-600 font-bold' : 'text-gray-400'}">💬</button>
-            <button class="delete-task">🗑️</button>
-        </div>
-    `;
-
-    row.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("type", "task");
-        e.dataTransfer.setData("taskId", tid);
-        e.dataTransfer.setData("groupId", t.groupId);
-    });
-
-    // MODIFIED TO ADD LOGGING AND COLOR
-    row.querySelector(".edit-task").addEventListener("click", () => {
-        openModal("Edit Task", [
-            { id: "title", placeholder: "Task title", type: "text", value: t.title },
-            { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
-        ], async (vals) => {
-            const oldTitle = t.title;
-            await updateDoc(doc(db, "tasks", tid), {
-                title: vals.title,
-                color: vals.color,
-                updatedAt: serverTimestamp(),
-                updatedBy: auth.currentUser?.email || "Ẩn danh"
-            });
-            await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+        // Add event listeners only once
+        row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("type", "task");
+            e.dataTransfer.setData("taskId", tid);
+            e.dataTransfer.setData("groupId", t.groupId);
         });
-    });
 
-    // MODIFIED TO ADD LOGGING
-    row.querySelector(".comment-task").addEventListener("click", () => {
-        openModal("Comment Task", [
-            { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
-        ], async (vals) => {
-            if (vals.comment && vals.comment.trim().length > 0) {
+        row.querySelector(".edit-task").addEventListener("click", () => {
+            openModal("Edit Task", [
+                { id: "title", placeholder: "Task title", type: "text", value: t.title },
+                { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
+            ], async (vals) => {
+                const oldTitle = t.title;
                 await updateDoc(doc(db, "tasks", tid), {
-                    comment: vals.comment.trim(),
+                    title: vals.title,
+                    color: vals.color,
                     updatedAt: serverTimestamp(),
                     updatedBy: auth.currentUser?.email || "Ẩn danh"
                 });
-                await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
-            } else {
-                await updateDoc(doc(db, "tasks", tid), {
-                    comment: deleteField(),
-                    updatedAt: serverTimestamp(),
-                    updatedBy: auth.currentUser?.email || "Ẩn danh"
-                });
-                await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+                await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+            });
+        });
+
+        row.querySelector(".comment-task").addEventListener("click", () => {
+            openModal("Comment Task", [
+                { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+            ], async (vals) => {
+                if (vals.comment && vals.comment.trim().length > 0) {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: vals.comment.trim(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
+                } else {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: deleteField(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+                }
+            });
+        });
+
+        row.querySelector(".delete-task").addEventListener("click", async () => {
+            if (confirm("Xóa task này?")) {
+                await deleteDoc(doc(db, "tasks", tid));
+                await logAction(t.projectId, `xóa task "${t.title}"`);
             }
         });
-    });
+    }
 
-    // MODIFIED TO ADD LOGGING
-    row.querySelector(".delete-task").addEventListener("click", async () => {
-        if (confirm("Xóa task này?")) {
-            await deleteDoc(doc(db, "tasks", tid));
-            await logAction(t.projectId, `xóa task "${t.title}"`);
-        }
-    });
-
-    col.appendChild(row);
+    // Luôn cập nhật trạng thái màu sắc của icon comment
+    const hasComment = t.comment && t.comment.trim().length > 0;
+    const commentBtn = row.querySelector(".comment-task");
+    if (hasComment) {
+        commentBtn.classList.remove("text-gray-400");
+        commentBtn.classList.add("text-blue-600", "font-bold");
+    } else {
+        commentBtn.classList.remove("text-blue-600", "font-bold");
+        commentBtn.classList.add("text-gray-400");
+    }
 }
 
 
