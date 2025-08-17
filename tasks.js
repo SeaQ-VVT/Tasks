@@ -367,13 +367,20 @@ function listenForProjectProgress(projectId) {
     const historyCol = collection(db, "progress_history");
     const qHistory = query(historyCol, where("projectId", "==", projectId));
     
+    // Thêm listener mới và lưu vào biến
     historyUnsub = onSnapshot(qHistory, (snapshot) => {
         let projectHistory = [];
         snapshot.forEach(doc => {
             projectHistory.push(doc.data());
         });
         
-        projectHistory.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+        projectHistory.sort((a, b) => {
+            // Sắp xếp lại dữ liệu theo timestamp
+            if (a.timestamp && b.timestamp) {
+                return a.timestamp.toDate() - b.timestamp.toDate();
+            }
+            return 0;
+        });
         
         updateProjectChart(projectHistory);
     });
@@ -382,6 +389,7 @@ function listenForProjectProgress(projectId) {
     const tasksCol = collection(db, "tasks");
     const qTasks = query(tasksCol, where("projectId", "==", projectId));
 
+    // Thêm listener mới và lưu vào biến
     tasksProgressUnsub = onSnapshot(qTasks, async (snapshot) => {
         let totalProgress = 0;
         let totalTasks = 0;
