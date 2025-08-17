@@ -31,7 +31,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== Modal helper =====
+// ===== Modal helper (UPDATED) =====
 function openModal(title, fields, onSave) {
     let modal = document.getElementById("popupModal");
     if (!modal) {
@@ -64,12 +64,30 @@ function openModal(title, fields, onSave) {
                     <input id="${f.id}" type="color" class="border p-1 w-full" value="${f.value || "#000000"}">
                 </div>
             `;
-        } else {
+        } else if (f.type === "range") {
+             fieldsDiv.innerHTML += `
+                <div class="flex flex-col">
+                    <label for="${f.id}" class="text-gray-700">${f.label} (<span id="progress-value">${f.value || 0}</span>%)</label>
+                    <input id="${f.id}" type="range" min="0" max="100" value="${f.value || 0}" class="w-full">
+                </div>
+            `;
+        }
+        else {
             fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full" value="${f.value || ""}">`;
         }
     });
 
     modal.classList.remove("hidden");
+    
+    // Add listener for range input
+    const progressInput = document.getElementById("progress");
+    if (progressInput) {
+        const progressValueSpan = document.getElementById("progress-value");
+        progressInput.addEventListener("input", (e) => {
+            progressValueSpan.textContent = e.target.value;
+        });
+    }
+
 
     document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
     document.getElementById("modalSave").onclick = () => {
@@ -296,7 +314,7 @@ function loadTasks(groupId) {
     });
 }
 
-// ===== Render task row =====
+// ===== Render task row (UPDATED) =====
 function renderTask(docSnap) {
     const t = docSnap.data();
     const tid = docSnap.id;
@@ -310,16 +328,21 @@ function renderTask(docSnap) {
     if (!row) {
         row = document.createElement("div");
         row.id = `task-${tid}`;
-        row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
+        row.className = "flex flex-col bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
         row.style.borderLeft = `4px solid ${t.color || '#e5e7eb'}`;
         row.draggable = true;
 
         row.innerHTML = `
-            <span class="truncate">${t.title}</span>
-            <div class="space-x-1">
-                <button class="edit-task">✏️</button>
-                <button class="comment-task">💬</button>
-                <button class="delete-task">🗑️</button>
+            <div class="flex justify-between items-center w-full">
+                <span class="truncate">${t.title}</span>
+                <div class="space-x-1">
+                    <button class="edit-task">✏️</button>
+                    <button class="comment-task">💬</button>
+                    <button class="delete-task">🗑️</button>
+                </div>
+            </div>
+            <div id="progress-container-${tid}" class="mt-1 w-full bg-gray-200 rounded-full h-2.5">
+                <div class="bg-green-600 h-2.5 rounded-full" style="width: ${t.progress || 0}%;"></div>
             </div>
         `;
         
@@ -336,16 +359,26 @@ function renderTask(docSnap) {
         row.querySelector(".edit-task").addEventListener("click", () => {
             openModal("Edit Task", [
                 { id: "title", placeholder: "Task title", type: "text", value: t.title },
+                { id: "progress", label: "Tiến độ", type: "range", value: t.progress || 0 },
                 { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
             ], async (vals) => {
                 const oldTitle = t.title;
+                const oldProgress = t.progress;
+
                 await updateDoc(doc(db, "tasks", tid), {
                     title: vals.title,
                     color: vals.color,
+                    progress: parseInt(vals.progress),
                     updatedAt: serverTimestamp(),
                     updatedBy: auth.currentUser?.email || "Ẩn danh"
                 });
-                await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+
+                if (oldTitle !== vals.title) {
+                    await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+                }
+                if (oldProgress !== parseInt(vals.progress)) {
+                     await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
+                }
             });
         });
 
@@ -389,6 +422,12 @@ function renderTask(docSnap) {
         commentBtn.classList.remove("text-blue-600", "font-bold");
         commentBtn.classList.add("text-gray-400");
     }
+
+    // Update progress bar
+    const progressBar = row.querySelector(`#progress-container-${tid} div`);
+    if (progressBar) {
+        progressBar.style.width = `${t.progress || 0}%`;
+    }
 }
 
 
@@ -429,10 +468,11 @@ function openTaskModal(groupId, projectId) {
     openModal("Thêm Task", [
         { id: "title", placeholder: "Tên Task" },
         { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" },
-        { id: "color", label: "Màu", type: "color" }
+        { id: "color", label: "Màu", type: "color" },
+        { id: "progress", label: "Tiến độ", type: "range", value: 0 }
     ], async (vals) => {
         await addDoc(collection(db, "tasks"), {
-            title: vals.title, comment: vals.comment || "", color: vals.color || null,
+            title: vals.title, comment: vals.comment || "", color: vals.color || null, progress: parseInt(vals.progress),
             projectId, groupId, status: "todo",
             createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
         });
