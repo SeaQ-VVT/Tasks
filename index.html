@@ -29,12 +29,22 @@
     .nav-hidden { transform: translateY(-95%); opacity: 0; }
     .nav-visible { transform: translateY(0); opacity: 1; }
 
-    /* “Vùng nóng” kích hoạt khi rê chuột sát mép trên */
+    /* “Vùng nóng” kích hoạt khi rê/chạm sát mép trên */
     #navHotZone {
       position: fixed;
       top: 0; left: 0; right: 0;
-      height: 16px;         /* tăng nếu muốn dễ bắt hơn */
-      z-index: 1100;        /* cao hơn nav-bar */
+      height: 16px;      /* desktop */
+      z-index: 1100;     /* cao hơn nav-bar */
+    }
+
+    /* Mobile/tablet: vùng kích hoạt cao hơn để dễ chạm */
+    @media (pointer: coarse) {
+      #navHotZone { height: 40px; }
+    }
+
+    /* iOS safe area (tai thỏ) */
+    @supports(padding: max(0px)) {
+      .nav-bar { padding-top: max(1rem, env(safe-area-inset-top)); }
     }
   </style>
 </head>
@@ -288,7 +298,7 @@
       }
     });
 
-    // ==== Auto-hide nav on hover near top ====
+    // ==== Auto-hide nav: desktop (hover) + mobile/tablet (touch & scroll) ====
     const navBar = document.getElementById('navBar');
 
     // Tạo “vùng nóng” sát mép trên
@@ -308,15 +318,40 @@
       navBar.classList.remove('nav-visible');
     }
 
+    // Phát hiện thiết bị cảm ứng
+    const isTouch =
+      window.matchMedia?.('(pointer: coarse)').matches ||
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0;
+
     // Ẩn mặc định
     hideNav();
 
-    // Rê chuột sát mép trên → hiện
-    hot.addEventListener('mouseenter', () => showNav());
-    // Giữ hiện khi đang ở trong nav
-    navBar.addEventListener('mouseenter', () => showNav(3000));
-    // Rời nav → ẩn lại
-    navBar.addEventListener('mouseleave', hideNav);
+    if (isTouch) {
+      // Mobile/tablet: show ngắn khi tải để người dùng biết có thanh nav
+      showNav(1200);
+
+      // Chạm/click vùng nóng => hiện
+      hot.addEventListener('touchstart', () => showNav(3000), { passive: true });
+      hot.addEventListener('click', () => showNav(3000));
+
+      // Chạm vào thanh nav => giữ hiện lâu hơn
+      navBar.addEventListener('touchstart', () => showNav(4000), { passive: true });
+
+      // Cuộn: lên => hiện, xuống => ẩn
+      let lastY = window.scrollY;
+      window.addEventListener('scroll', () => {
+        const y = window.scrollY;
+        if (y < lastY - 5) showNav(1500);   // scroll up
+        else if (y > lastY + 5) hideNav();  // scroll down
+        lastY = y;
+      }, { passive: true });
+    } else {
+      // Desktop: hover như cũ
+      hot.addEventListener('mouseenter', () => showNav());
+      navBar.addEventListener('mouseenter', () => showNav(3000));
+      navBar.addEventListener('mouseleave', hideNav);
+    }
   </script>
 
   <!-- Modules -->
