@@ -348,7 +348,6 @@ export function showTaskBoard(projectId, projectTitle) {
 
 // ===== Biểu đồ tổng tiến độ dự án =====
 let projectChart = null;
-let projectHistory = [];
 let progressUnsub = null; // Thêm biến để lưu listener của biểu đồ
 
 function listenForProjectProgress(projectId) {
@@ -358,38 +357,49 @@ function listenForProjectProgress(projectId) {
         progressUnsub = null;
     }
 
-    projectHistory = []; // Reset lịch sử khi chuyển dự án
+    // Lắng nghe dữ liệu lịch sử tiến độ từ Firestore
+    const historyCol = collection(db, "progress_history");
+    const qHistory = query(historyCol, where("projectId", "==", projectId));
     
-    progressUnsub = onSnapshot(collection(db, "tasks"), (snapshot) => {
+    progressUnsub = onSnapshot(qHistory, (snapshot) => {
+        let projectHistory = [];
+        snapshot.forEach(doc => {
+            projectHistory.push(doc.data());
+        });
+        
+        projectHistory.sort((a, b) => a.timestamp.toDate() - b.timestamp.toDate());
+        
+        updateProjectChart(projectHistory);
+    });
+
+    // Lắng nghe thay đổi tiến độ của các task và cập nhật lịch sử
+    const tasksCol = collection(db, "tasks");
+    const qTasks = query(tasksCol, where("projectId", "==", projectId));
+
+    onSnapshot(qTasks, async (snapshot) => {
         let totalProgress = 0;
         let totalTasks = 0;
         snapshot.forEach(doc => {
             const task = doc.data();
-            if (task.projectId === projectId) {
-                totalProgress += task.progress || 0;
-                totalTasks++;
-            }
+            totalProgress += task.progress || 0;
+            totalTasks++;
         });
 
         const currentProgress = totalTasks > 0 ? Math.round(totalProgress / totalTasks) : 0;
-        const now = new Date();
-        const lastEntry = projectHistory[projectHistory.length - 1];
         
-        // Chỉ thêm dữ liệu nếu tiến độ thay đổi hoặc đủ thời gian
-        if (!lastEntry || lastEntry.progress !== currentProgress || now - lastEntry.timestamp > 60000) { // Cập nhật mỗi phút hoặc khi có thay đổi
-             projectHistory.push({
-                timestamp: now,
-                progress: currentProgress
-            });
-            updateProjectChart();
-        }
+        // Ghi lại tiến độ vào Firestore
+        await addDoc(collection(db, "progress_history"), {
+            projectId,
+            progress: currentProgress,
+            timestamp: serverTimestamp()
+        });
     });
 }
 
-function updateProjectChart() {
+function updateProjectChart(projectHistory) {
     const ctx = document.getElementById('project-progress-chart').getContext('2d');
     
-    const labels = projectHistory.map(h => h.timestamp.toLocaleTimeString());
+    const labels = projectHistory.map(h => h.timestamp.toDate().toLocaleDateString() + ' ' + h.timestamp.toDate().toLocaleTimeString());
     const data = projectHistory.map(h => h.progress);
     
     if (projectChart) {
