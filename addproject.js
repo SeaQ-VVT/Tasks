@@ -55,6 +55,9 @@ const copyModal = document.getElementById("copyModal");
 const newProjectTitleInput = document.getElementById("newProjectTitle");
 const confirmCopyBtn = document.getElementById("confirmCopyBtn");
 const cancelCopyBtn = document.getElementById("cancelCopyBtn");
+const messageBox = document.getElementById("messageBox");
+const messageText = document.getElementById("messageText");
+const closeMessageBtn = document.getElementById("closeMessageBtn");
 
 let isEditing = false;
 let currentProjectId = null;
@@ -69,6 +72,22 @@ function hideModal(modalId) {
     const modal = document.getElementById(modalId);
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+}
+
+function showMessage(message) {
+    messageText.textContent = message;
+    messageBox.classList.remove('hidden');
+    messageBox.classList.add('flex');
+    setTimeout(() => {
+        hideModal('messageBox');
+    }, 3000);
+}
+
+// Event listener for closing the message box manually
+if (closeMessageBtn) {
+    closeMessageBtn.addEventListener('click', () => {
+        hideModal('messageBox');
+    });
 }
 
 // ===== Render project card =====
@@ -109,6 +128,11 @@ function setupProjectListener() {
 
     onSnapshot(q, (snapshot) => {
         projectArea.innerHTML = ""; // Clear the old list
+        if (snapshot.empty) {
+            projectArea.innerHTML = "<p class='text-center text-gray-500'>Không có dự án nào. Vui lòng tạo một dự án mới.</p>";
+            return;
+        }
+
         snapshot.forEach((doc) => {
             renderProject(doc);
         });
@@ -163,8 +187,7 @@ saveProjectBtn.addEventListener("click", async () => {
     const comment = projectCommentInput.value.trim();
 
     if (!title) {
-        // Use a more friendly UI instead of alert
-        console.error("Please enter a project title.");
+        showMessage("Vui lòng nhập tên dự án.");
         return;
     }
 
@@ -181,6 +204,7 @@ saveProjectBtn.addEventListener("click", async () => {
                 comment,
                 updatedAt: new Date(),
             });
+            showMessage("Cập nhật dự án thành công!");
         } else {
             await addDoc(collection(db, "projects"), {
                 title,
@@ -191,6 +215,7 @@ saveProjectBtn.addEventListener("click", async () => {
                 createdAt: new Date(),
                 createdBy: user ? user.email : "Ẩn danh",
             });
+            showMessage("Tạo dự án mới thành công!");
         }
 
         hideModal("projectModal");
@@ -201,7 +226,8 @@ saveProjectBtn.addEventListener("click", async () => {
         projectCommentInput.value = "";
         isEditing = false;
     } catch (e) {
-        console.error("Error adding/updating project: ", e);
+        console.error("Lỗi khi thêm/cập nhật dự án: ", e);
+        showMessage("Có lỗi xảy ra, không thể lưu dự án.");
     }
 });
 
@@ -231,7 +257,7 @@ function copyProject(id, data) {
 confirmCopyBtn.addEventListener("click", async () => {
     const newTitle = newProjectTitleInput.value.trim();
     if (!newTitle) {
-        console.error("Vui lòng nhập tên cho dự án mới.");
+        showMessage("Vui lòng nhập tên cho dự án mới.");
         return;
     }
 
@@ -280,10 +306,11 @@ confirmCopyBtn.addEventListener("click", async () => {
         await Promise.all(groupsToCopy);
 
         hideModal("copyModal");
-        console.log("Project and all associated data copied successfully!");
+        showMessage("Đã sao chép dự án và dữ liệu liên quan thành công!");
 
     } catch (e) {
-        console.error("Error copying project: ", e);
+        console.error("Lỗi khi sao chép dự án: ", e);
+        showMessage("Có lỗi xảy ra, không thể sao chép dự án.");
     }
 });
 
@@ -320,8 +347,10 @@ confirmDeleteBtn.addEventListener("click", async () => {
         await deleteDoc(doc(db, "projects", currentProjectId));
 
         hideModal("deleteModal");
+        showMessage("Dự án và tất cả dữ liệu liên quan đã bị xóa.");
     } catch (e) {
-        console.error("Error deleting project and associated data: ", e);
+        console.error("Lỗi khi xóa dự án và dữ liệu liên quan: ", e);
+        showMessage("Có lỗi xảy ra, không thể xóa dự án.");
     }
 });
 
@@ -349,4 +378,3 @@ auth.onAuthStateChanged((user) => {
         projectArea.innerHTML = "";
         addProjectBtn.classList.add("hidden");
     }
-});
