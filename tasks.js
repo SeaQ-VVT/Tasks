@@ -275,16 +275,14 @@ function loadTasks(groupId) {
     const q = query(tasksCol, where("groupId", "==", groupId));
 
     onSnapshot(q, (snapshot) => {
-        snapshot.docChanges().forEach((change) => {
-            const tid = change.doc.id;
-            const oldElement = document.getElementById(`task-${tid}`);
+        // Clear the container first to avoid duplicates
+        const container = document.getElementById(`tasks-${groupId}`);
+        if (container) {
+            container.innerHTML = '';
+        }
 
-            if (change.type === "added" || change.type === "modified") {
-                if (oldElement) oldElement.remove();
-                renderTask(change.doc);
-            } else if (change.type === "removed") {
-                if (oldElement) oldElement.remove();
-            }
+        snapshot.forEach((docSnap) => {
+            renderTask(docSnap);
         });
     });
 }
