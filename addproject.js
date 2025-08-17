@@ -63,6 +63,12 @@ function hideModal(modalId) {
     modal.classList.remove('flex');
 }
 
+// ===== Get user display name from email =====
+function getUserDisplayName(email) {
+    if (!email) return "Ẩn danh";
+    return email.split('@')[0];
+}
+
 // ===== Render project card =====
 function renderProject(doc) {
     const data = doc.data();
@@ -76,13 +82,15 @@ function renderProject(doc) {
         ? data.createdAt.toDate().toLocaleString()
         : "-";
 
+    const createdBy = getUserDisplayName(data.createdBy);
+
     projectCard.innerHTML = `
         <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
         <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
         <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
         <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
         <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
-        <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${data.createdBy || "Không rõ"}</p>
+        <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${createdBy}</p>
         <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
         <div class="flex space-x-2 mt-2">
             <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
@@ -240,4 +248,3 @@ auth.onAuthStateChanged((user) => {
         addProjectBtn.classList.add("hidden");
     }
 });
-
