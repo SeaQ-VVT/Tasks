@@ -29,183 +29,380 @@ const firebaseConfig = {
   projectId: "task-manager-d18aa",
   storageBucket: "task-manager-d18aa.appspot.com",
   messagingSenderId: "1080268498085",
-  appId: "1:1080268498085:web:767434c6a2c0"
+  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
+// ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
 const db = getFirestore(app);
-const auth = getAuth();
 
 // ===== DOM elements =====
-const projectList = document.getElementById("projectList");
+const projectArea = document.getElementById("projectArea");
 const addProjectBtn = document.getElementById("addProjectBtn");
 const projectModal = document.getElementById("projectModal");
 const projectModalTitle = document.getElementById("projectModalTitle");
-const projectForm = document.getElementById("projectForm");
 const projectTitleInput = document.getElementById("projectTitle");
 const projectDescriptionInput = document.getElementById("projectDescription");
-const projectStartInput = document.getElementById("projectStart");
-const projectEndInput = document.getElementById("projectEnd");
+const projectStartInput = document.getElementById("projectStartDate");
+const projectEndInput = document.getElementById("projectEndDate");
 const projectCommentInput = document.getElementById("projectComment");
+const saveProjectBtn = document.getElementById("saveProjectBtn");
 const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 const deleteModal = document.getElementById("deleteModal");
 const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const toggleThemeBtn = document.getElementById("toggleThemeBtn");
 
+// Copy modal elements (tạo nếu chưa có)
+let copyModal = document.getElementById("copyModal");
+let newProjectTitleInput = document.getElementById("newProjectTitle");
+let confirmCopyBtn = document.getElementById("confirmCopyBtn");
+let cancelCopyBtn = document.getElementById("cancelCopyBtn");
+
+function ensureCopyModal() {
+  if (copyModal && newProjectTitleInput && confirmCopyBtn && cancelCopyBtn) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = `
+    <div id="copyModal" class="hidden fixed inset-0 z-50 items-center justify-center bg-black bg-opacity-40">
+      <div class="bg-white w-full max-w-md mx-4 rounded-lg shadow-lg p-5">
+        <h3 class="text-lg font-semibold mb-3">Sao chép dự án</h3>
+        <label class="block text-sm text-gray-600 mb-1">Tên dự án mới</label>
+        <input id="newProjectTitle" class="w-full border rounded px-3 py-2 mb-4" placeholder="Nhập tên dự án mới" />
+        <div class="flex justify-end gap-2">
+          <button id="cancelCopyBtn" class="px-3 py-2 rounded bg-gray-200 hover:bg-gray-300">Hủy</button>
+          <button id="confirmCopyBtn" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white">Sao chép</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrapper);
+
+  copyModal = document.getElementById("copyModal");
+  newProjectTitleInput = document.getElementById("newProjectTitle");
+  confirmCopyBtn = document.getElementById("confirmCopyBtn");
+  cancelCopyBtn = document.getElementById("cancelCopyBtn");
+
+  cancelCopyBtn.addEventListener("click", () => hideModal("copyModal"));
+}
+
+// ===== State =====
 let isEditing = false;
 let currentProjectId = null;
-let currentUser = null;
+// >>> NEW: nhớ dự án đang mở để không bị nhảy sang dự án khác khi realtime update
+let openedProjectId = null;
 
-// ===== Helper functions =====
-const showModal = (modalId) => {
-  document.getElementById(modalId).classList.remove("hidden");
-  document.getElementById(modalId).classList.add("flex");
-};
+// ===== Utility =====
+function showModal(modalId) {
+  const el = document.getElementById(modalId);
+  if (!el) return;
+  el.classList.remove("hidden");
+  el.classList.add("flex");
+}
 
-const hideModal = (modalId) => {
-  document.getElementById(modalId).classList.add("hidden");
-  document.getElementById(modalId).classList.remove("flex");
-};
+function hideModal(modalId) {
+  const modal = document.getElementById(modalId);
+  if (!modal) return;
+  modal.classList.add("hidden");
+  modal.classList.remove("flex");
+}
+function displayName(email) {
+  if (!email) return "Ẩn danh";
+  return String(email).split("@")[0];
+}
 
-const logAction = async (projectId, message) => {
-  await addDoc(collection(db, "logs"), {
-    projectId: projectId,
-    message: message,
-    timestamp: serverTimestamp(),
-    user: currentUser?.email || "Ẩn danh"
+// ===== Render project card =====
+function renderProject(docSnap) {
+  const data = docSnap.data();
+  const id = docSnap.id;
+
+  const projectCard = document.createElement("div");
+  projectCard.className =
+    "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-105 mb-4";
+
+  const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
+
+  projectCard.innerHTML = `
+    <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
+    <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
+    <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
+    <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
+    <div class="flex space-x-2 mt-2">
+      <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+      <button data-id="${id}" class="copy-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
+      <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
+      <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
+    </div>
+  `;
+  projectArea.appendChild(projectCard);
+}
+
+// ===== Real-time listener =====
+function setupProjectListener() {
+  const projectsCol = collection(db, "projects");
+  const q = query(projectsCol, orderBy("createdAt", "desc"));
+
+  onSnapshot(q, (snapshot) => {
+    // Chỉ render lại danh sách thẻ dự án, KHÔNG đụng taskBoard
+    projectArea.innerHTML = "";
+    snapshot.forEach((doc) => {
+      renderProject(doc);
+    });
+
+    // Events
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.id;
+        const docToEdit = snapshot.docs.find((d) => d.id === id);
+        if (docToEdit) {
+          editProject(id, docToEdit.data());
+        }
+      });
+    });
+
+    document.querySelectorAll(".delete-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.id;
+        showDeleteConfirmation(id);
+      });
+    });
+
+    document.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.id;
+        const docToCopy = snapshot.docs.find((d) => d.id === id);
+        if (docToCopy) {
+          copyProject(id, docToCopy.data());
+        }
+      });
+    });
+
+    document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const id = e.currentTarget.dataset.id;
+        const docToView = snapshot.docs.find((d) => d.id === id);
+        if (docToView) {
+          const projectTitle = docToView.data().title;
+          openedProjectId = id; // nhớ dự án đang mở
+          console.log("Viewing tasks for project:", id);
+          showTaskBoard(id, projectTitle);
+        }
+      });
+    });
   });
-};
+}
 
-const deleteProject = (projectId) => {
-  currentProjectId = projectId;
-  showModal("deleteModal");
-};
-
-// ===== Show projects in UI =====
-const renderProjects = (projects) => {
-  projectList.innerHTML = "";
-  if (projects.length === 0) {
-    projectList.innerHTML = "<p class='text-center text-gray-500 dark:text-gray-400'>Không có dự án nào.</p>";
-    return;
-  }
-  projects.forEach((project) => {
-    const projectItem = document.createElement("div");
-    projectItem.className = "bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 hover:shadow-lg transition-shadow duration-300 cursor-pointer relative group";
-    projectItem.innerHTML = `
-      <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">${project.title}</h3>
-      <p class="text-gray-600 dark:text-gray-400 mb-2">${project.description}</p>
-      <div class="text-sm text-gray-500 dark:text-gray-400">
-        <p>Bắt đầu: ${project.startDate || "N/A"}</p>
-        <p>Kết thúc: ${project.endDate || "N/A"}</p>
-      </div>
-      <div class="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-        <button class="edit-btn text-blue-500 hover:text-blue-700" data-id="${project.id}">
-          <i class="fas fa-edit"></i>
-        </button>
-        <button class="delete-btn text-red-500 hover:text-red-700" data-id="${project.id}">
-          <i class="fas fa-trash-alt"></i>
-        </button>
-      </div>
-    `;
-    projectItem.addEventListener("click", (e) => {
-      if (!e.target.closest(".edit-btn") && !e.target.closest(".delete-btn")) {
-        showTaskBoard(project.id, project.title);
-      }
-    });
-    projectItem.querySelector(".edit-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      editProject(project);
-    });
-    projectItem.querySelector(".delete-btn").addEventListener("click", (e) => {
-      e.stopPropagation();
-      deleteProject(project.id);
-    });
-    projectList.appendChild(projectItem);
-  });
-};
-
-// ===== Add/Update project =====
-projectForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const title = projectTitleInput.value;
-  const description = projectDescriptionInput.value;
+// ===== Add / Update project =====
+saveProjectBtn.addEventListener("click", async () => {
+  const title = projectTitleInput.value.trim();
+  const description = projectDescriptionInput.value.trim();
   const startDate = projectStartInput.value;
   const endDate = projectEndInput.value;
-  const comment = projectCommentInput.value;
+  const comment = projectCommentInput.value.trim();
 
-  if (isEditing) {
-    const projectRef = doc(db, "projects", currentProjectId);
-    await updateDoc(projectRef, {
-      title,
-      description,
-      startDate,
-      endDate,
-      comment,
-      updatedAt: serverTimestamp(),
-      updatedBy: currentUser?.email || "Ẩn danh"
-    });
-    await logAction(currentProjectId, `cập nhật dự án "${title}"`);
-    isEditing = false;
-  } else {
-    const newProject = {
-      title,
-      description,
-      startDate,
-      endDate,
-      comment,
-      createdAt: serverTimestamp(),
-      createdBy: currentUser?.email || "Ẩn danh"
-    };
-    const docRef = await addDoc(collection(db, "projects"), newProject);
-    await logAction(docRef.id, `tạo dự án mới "${title}"`);
+  if (!title) {
+    console.error("Please enter a project title.");
+    return;
   }
-  hideModal("projectModal");
-  projectForm.reset();
+
+  try {
+    const user = auth.currentUser;
+
+    if (isEditing) {
+      const projectDocRef = doc(db, "projects", currentProjectId);
+      await updateDoc(projectDocRef, {
+        title,
+        description,
+        startDate,
+        endDate,
+        comment,
+        updatedAt: new Date()
+      });
+    } else {
+      await addDoc(collection(db, "projects"), {
+        title,
+        description,
+        startDate,
+        endDate,
+        comment,
+        createdAt: new Date(),
+        createdBy: user ? user.email : "Ẩn danh"
+      });
+    }
+
+    hideModal("projectModal");
+    projectTitleInput.value = "";
+    projectDescriptionInput.value = "";
+    projectStartInput.value = "";
+    projectEndInput.value = "";
+    projectCommentInput.value = "";
+    // giữ nguyên isEditing theo flow hiện tại
+
+  } catch (e) {
+    console.error("Error adding/updating project: ", e);
+  }
 });
 
-// ===== Edit project modal =====
-const editProject = async (project) => {
+// ===== Edit project =====
+function editProject(id, data) {
   isEditing = true;
-  currentProjectId = project.id;
-  projectModalTitle.textContent = "Chỉnh sửa dự án";
-  projectTitleInput.value = project.title;
-  projectDescriptionInput.value = project.description;
-  projectStartInput.value = project.startDate;
-  projectEndInput.value = project.endDate;
-  projectCommentInput.value = project.comment;
-  showModal("projectModal");
-};
+  currentProjectId = id;
 
-// ===== Delete project and all associated data =====
+  projectModalTitle.textContent = "Cập nhật dự án";
+  projectTitleInput.value = data.title || "";
+  projectDescriptionInput.value = data.description || "";
+  projectStartInput.value = data.startDate || "";
+  projectEndInput.value = data.endDate || "";
+  projectCommentInput.value = data.comment || "";
+
+  showModal("projectModal");
+}
+
+// ===== Copy project =====
+function copyProject(id, data) {
+  ensureCopyModal();
+  currentProjectId = id;
+  newProjectTitleInput.value = `${data.title} (Bản sao)`;
+  showModal("copyModal");
+}
+
+// Helper: (tuỳ chọn) copy subcollections của task nếu bạn có dùng
+async function copyTaskSubcollections(oldTaskId, newTaskId) {
+  // Nếu không dùng subcollection cho task, bạn có thể bỏ qua function này.
+  // Ví dụ các subcollection phổ biến: ["subtasks", "comments", "files"]
+  const subs = []; // để trống để không ảnh hưởng logic hiện tại
+  for (const sub of subs) {
+    const q = query(collection(db, `tasks/${oldTaskId}/${sub}`));
+    const snap = await getDocs(q);
+    if (snap.empty) continue;
+    const ops = snap.docs.map((d) => {
+      const data = d.data();
+      delete data.createdAt;
+      delete data.updatedAt;
+      return addDoc(collection(db, `tasks/${newTaskId}/${sub}`), {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      });
+    });
+    await Promise.all(ops);
+  }
+}
+
+ensureCopyModal();
+
+if (confirmCopyBtn) {
+  confirmCopyBtn.addEventListener("click", async () => {
+    const newTitle = (newProjectTitleInput?.value || "").trim();
+    if (!newTitle) {
+      console.error("Vui lòng nhập tên cho dự án mới.");
+      return;
+    }
+
+    confirmCopyBtn.disabled = true;
+
+    try {
+      const user = auth.currentUser;
+      const srcDoc = await getDoc(doc(db, "projects", currentProjectId));
+      if (!srcDoc.exists()) throw new Error("Dự án gốc không tồn tại.");
+      const src = srcDoc.data() || {};
+
+      // 1) Tạo project mới (làm sạch metadata cũ)
+      const { createdAt, updatedAt, createdBy, ...rest } = src;
+      const newProjectRef = await addDoc(collection(db, "projects"), {
+        ...rest,
+        title: newTitle,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: user ? user.email : "Ẩn danh"
+      });
+      const newProjectId = newProjectRef.id;
+
+      // 2) Copy GROUPS trước, tạo map oldGroupId -> newGroupId
+      const groupsQ = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
+      const groupsSnap = await getDocs(groupsQ);
+
+      const groupIdMap = new Map();
+      await Promise.all(
+        groupsSnap.docs.map(async (g) => {
+          const gData = g.data();
+          const { createdAt, updatedAt, projectId, ...gRest } = gData;
+          const newGRef = await addDoc(collection(db, "groups"), {
+            ...gRest,
+            projectId: newProjectId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          groupIdMap.set(g.id, newGRef.id);
+        })
+      );
+
+      // 3) Copy TASKS (remap projectId & groupId nếu có)
+      const tasksQ = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
+      const tasksSnap = await getDocs(tasksQ);
+
+      await Promise.all(
+        tasksSnap.docs.map(async (t) => {
+          const tData = t.data();
+          const { createdAt, updatedAt, projectId, groupId, ...tRest } = tData;
+
+          const newTaskRef = await addDoc(collection(db, "tasks"), {
+            ...tRest,
+            projectId: newProjectId,
+            groupId: groupId ? groupIdMap.get(groupId) || null : null,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+
+          await copyTaskSubcollections(t.id, newTaskRef.id);
+        })
+      );
+
+      hideModal("copyModal");
+      console.log("Đã sao chép dự án và toàn bộ dữ liệu liên quan thành công!");
+
+    } catch (e) {
+      console.error("Lỗi khi sao chép dự án:", e);
+    } finally {
+      confirmCopyBtn.disabled = false;
+    }
+  });
+}
+
+if (cancelCopyBtn) {
+  cancelCopyBtn.addEventListener("click", () => hideModal("copyModal"));
+}
+
+// ===== Delete project and associated data =====
+function showDeleteConfirmation(id) {
+  currentProjectId = id;
+  showModal("deleteModal");
+}
+
 confirmDeleteBtn.addEventListener("click", async () => {
   try {
-    // Tìm và xóa tất cả tasks liên quan đến dự án
+    // Find and delete all tasks associated with the project
     const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
     const tasksSnapshot = await getDocs(tasksQuery);
     const tasksToDelete = tasksSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(tasksToDelete);
 
-    // Tìm và xóa tất cả groups liên quan đến dự án
+    // Find and delete all groups associated with the project
     const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
     const groupsSnapshot = await getDocs(groupsQuery);
     const groupsToDelete = groupsSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(groupsToDelete);
 
-    // Tìm và xóa tất cả logs liên quan đến dự án
+    // Find and delete all logs associated with the project
     const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
     const logsSnapshot = await getDocs(logsQuery);
     const logsToDelete = logsSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(logsToDelete);
-    
-    // Tìm và xóa tất cả lịch sử tiến độ liên quan đến dự án
-    const progressQuery = query(collection(db, "progress_history"), where("projectId", "==", currentProjectId));
-    const progressSnapshot = await getDocs(progressQuery);
-    const progressToDelete = progressSnapshot.docs.map((docu) => deleteDoc(docu.ref));
-    await Promise.all(progressToDelete);
-    
-    // Cuối cùng, xóa tài liệu dự án
+
+    // Finally, delete the project document itself
     await deleteDoc(doc(db, "projects", currentProjectId));
 
     hideModal("deleteModal");
@@ -232,21 +429,10 @@ addProjectBtn.addEventListener("click", () => {
 // ===== Auth listener =====
 auth.onAuthStateChanged((user) => {
   if (user) {
-    currentUser = user;
-    const q = query(collection(db, "projects"), where("createdBy", "==", currentUser.email || "Ẩn danh"), orderBy("createdAt", "desc"));
-    onSnapshot(q, (snapshot) => {
-      let projects = [];
-      snapshot.forEach((doc) => {
-        projects.push({ ...doc.data(), id: doc.id });
-      });
-      renderProjects(projects);
-    });
+    addProjectBtn.classList.remove("hidden");
+    setupProjectListener();
   } else {
-    // Xử lý khi người dùng chưa đăng nhập, nếu cần
+    projectArea.innerHTML = "";
+    addProjectBtn.classList.add("hidden");
   }
-});
-
-// ===== Theme toggle =====
-toggleThemeBtn.addEventListener("click", () => {
-  document.documentElement.classList.toggle("dark");
 });
