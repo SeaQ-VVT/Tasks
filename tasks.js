@@ -191,13 +191,16 @@ function daysUntil(dateStr) {
   const d = new Date(dateStr + "T23:59:59");
   return Math.floor((d - today) / (1000 * 60 * 60 * 24));
 }
+
+// ✅ Duyệt NGƯỢC để map đúng khi thresholds là [14,7,3]
 function colorClassByDaysLeft(days, cfg = DEADLINE_CFG) {
   const { thresholds, classes } = cfg;
-  for (let i = 0; i < thresholds.length; i++) {
+  for (let i = thresholds.length - 1; i >= 0; i--) {
     if (days <= thresholds[i]) return classes[i];
   }
   return "";
 }
+
 function getGroupWarnClass(g) {
   if (!g || !g.deadline) return "";
   const left = daysUntil(g.deadline);
@@ -205,9 +208,15 @@ function getGroupWarnClass(g) {
   if (g.status === "inprogress") return colorClassByDaysLeft(left);
   return ""; // done => không cảnh báo
 }
+
+// ✅ Gỡ sạch MỌI class bắt đầu bằng "ring-" trước khi tô
 function removeWarnClasses(el) {
-  el?.classList.remove("ring-2","ring-red-500","ring-yellow-400","ring-orange-300");
+  if (!el) return;
+  [...el.classList].forEach(c => {
+    if (c.startsWith("ring-")) el.classList.remove(c);
+  });
 }
+
 function applyGroupColor(gid, g) {
   const cls = getGroupWarnClass(g);
 
