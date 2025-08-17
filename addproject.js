@@ -50,9 +50,12 @@ const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 const deleteModal = document.getElementById("deleteModal");
 const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+const copyModal = document.getElementById("copyModal");
+const newProjectTitleInput = document.getElementById("newProjectTitle");
+const confirmCopyBtn = document.getElementById("confirmCopyBtn");
+const cancelCopyBtn = document.getElementById("cancelCopyBtn");
 
 let isEditing = false;
-let isCopying = false;
 let currentProjectId = null;
 
 // ===== Utility =====
@@ -150,7 +153,7 @@ function setupProjectListener() {
         });
     });
 }
-// ===== Add / Update / Copy project =====
+// ===== Add / Update project =====
 saveProjectBtn.addEventListener("click", async () => {
     const title = projectTitleInput.value.trim();
     const description = projectDescriptionInput.value.trim();
@@ -177,39 +180,6 @@ saveProjectBtn.addEventListener("click", async () => {
                 comment,
                 updatedAt: new Date(),
             });
-        } else if (isCopying) {
-            // Step 1: Create a new project document
-            const newProjectRef = await addDoc(collection(db, "projects"), {
-                title,
-                description,
-                startDate,
-                endDate,
-                comment,
-                createdAt: new Date(),
-                createdBy: user ? user.email : "Ẩn danh",
-            });
-            const newProjectId = newProjectRef.id;
-
-            // Step 2: Find and copy all tasks associated with the old project
-            const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
-            const tasksSnapshot = await getDocs(tasksQuery);
-            const tasksToCopy = tasksSnapshot.docs.map(taskDoc => {
-                const data = taskDoc.data();
-                return addDoc(collection(db, "tasks"), { ...data, projectId: newProjectId });
-            });
-            await Promise.all(tasksToCopy);
-
-            // Step 3: Find and copy all logs associated with the old project
-            const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
-            const logsSnapshot = await getDocs(logsQuery);
-            const logsToCopy = logsSnapshot.docs.map(logDoc => {
-                const data = logDoc.data();
-                return addDoc(collection(db, "logs"), { ...data, projectId: newProjectId });
-            });
-            await Promise.all(logsToCopy);
-
-            console.log("Project and all associated data copied successfully!");
-
         } else {
             await addDoc(collection(db, "projects"), {
                 title,
@@ -229,17 +199,14 @@ saveProjectBtn.addEventListener("click", async () => {
         projectEndInput.value = "";
         projectCommentInput.value = "";
         isEditing = false;
-        isCopying = false;
-
     } catch (e) {
-        console.error("Error adding/updating/copying project: ", e);
+        console.error("Error adding/updating project: ", e);
     }
 });
 
 // ===== Edit project =====
 function editProject(id, data) {
     isEditing = true;
-    isCopying = false;
     currentProjectId = id;
 
     projectModalTitle.textContent = "Cập nhật dự án";
@@ -252,21 +219,71 @@ function editProject(id, data) {
     showModal("projectModal");
 }
 
+
 // ===== Copy project =====
 function copyProject(id, data) {
-    isEditing = false;
-    isCopying = true;
     currentProjectId = id;
-    
-    projectModalTitle.textContent = `Sao chép dự án "${data.title}"`;
-    projectTitleInput.value = `${data.title} (Bản sao)`;
-    projectDescriptionInput.value = data.description || "";
-    projectStartInput.value = data.startDate || "";
-    projectEndInput.value = data.endDate || "";
-    projectCommentInput.value = data.comment || "";
-    
-    showModal("projectModal");
+    newProjectTitleInput.value = `${data.title} (Bản sao)`;
+    showModal("copyModal");
 }
+
+confirmCopyBtn.addEventListener("click", async () => {
+    const newTitle = newProjectTitleInput.value.trim();
+    if (!newTitle) {
+        console.error("Vui lòng nhập tên cho dự án mới.");
+        return;
+    }
+
+    try {
+        const user = auth.currentUser;
+        const projectDoc = await getDoc(doc(db, "projects", currentProjectId));
+        const projectData = projectDoc.data();
+        
+        // Step 1: Create a new project document with the new title
+        const newProjectRef = await addDoc(collection(db, "projects"), {
+            ...projectData,
+            title: newTitle,
+            createdAt: new Date(),
+            createdBy: user ? user.email : "Ẩn danh",
+        });
+        const newProjectId = newProjectRef.id;
+
+        // Step 2: Find and copy all tasks associated with the old project
+        const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasksToCopy = tasksSnapshot.docs.map(taskDoc => {
+            const data = taskDoc.data();
+            return addDoc(collection(db, "tasks"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(tasksToCopy);
+
+        // Step 3: Find and copy all logs associated with the old project
+        const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
+        const logsSnapshot = await getDocs(logsQuery);
+        const logsToCopy = logsSnapshot.docs.map(logDoc => {
+            const data = logDoc.data();
+            return addDoc(collection(db, "logs"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(logsToCopy);
+
+        // Step 4: Find and copy all groups associated with the old project
+        const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
+        const groupsSnapshot = await getDocs(groupsQuery);
+        const groupsToCopy = groupsSnapshot.docs.map(groupDoc => {
+            const data = groupDoc.data();
+            return addDoc(collection(db, "groups"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(groupsToCopy);
+
+        hideModal("copyModal");
+        console.log("Project and all associated data copied successfully!");
+
+    } catch (e) {
+        console.error("Error copying project: ", e);
+    }
+});
+
+cancelCopyBtn.addEventListener("click", () => hideModal("copyModal"));
 
 
 // ===== Delete project and associated data =====
@@ -310,7 +327,6 @@ cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
 // ===== Add project modal =====
 addProjectBtn.addEventListener("click", () => {
     isEditing = false;
-    isCopying = false;
     projectModalTitle.textContent = "Tạo dự án mới";
     projectTitleInput.value = "";
     projectDescriptionInput.value = "";
