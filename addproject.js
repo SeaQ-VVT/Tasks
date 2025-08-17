@@ -407,7 +407,12 @@ confirmDeleteBtn.addEventListener("click", async () => {
     await Promise.all(progressSnapshot.docs.map((docu) => deleteDoc(docu.ref)));
     // Finally, delete the project document itself
     await deleteDoc(doc(db, "projects", currentProjectId));
-
+    // 🔻 THÊM 4 DÒNG NÀY Ở ĐÂY
+    if (openedProjectId === currentProjectId) {
+      const taskBoard = document.getElementById("taskBoard");
+      if (taskBoard) taskBoard.innerHTML = "";
+      openedProjectId = null;
+    }
     hideModal("deleteModal");
   } catch (e) {
     console.error("Error deleting project and associated data: ", e);
@@ -439,4 +444,5 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
+
 
