@@ -57,6 +57,13 @@ function openModal(title, fields, onSave) {
     fields.forEach(f => {
         if (f.type === "textarea") {
             fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" class="border p-2 w-full">${f.value || ""}</textarea>`;
+        } else if (f.type === "color") {
+            fieldsDiv.innerHTML += `
+                <div class="flex items-center space-x-2">
+                    <label for="${f.id}" class="text-gray-700 w-20">${f.label}:</label>
+                    <input id="${f.id}" type="color" class="border p-1 w-full" value="${f.value || "#000000"}">
+                </div>
+            `;
         } else {
             fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full" value="${f.value || ""}">`;
         }
@@ -295,10 +302,12 @@ function renderTask(docSnap) {
     if (old) old.remove();
 
     const hasComment = (t.comment && String(t.comment).trim().length > 0);
+    const borderColor = t.color || '#e5e7eb'; // Default to gray-200 if no color is set
 
     const row = document.createElement("div");
     row.id = `task-${tid}`;
-    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
+    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
+    row.style.borderLeft = `4px solid ${borderColor}`;
     row.draggable = true;
 
     row.innerHTML = `
@@ -316,14 +325,16 @@ function renderTask(docSnap) {
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    // MODIFIED TO ADD LOGGING
+    // MODIFIED TO ADD LOGGING AND COLOR
     row.querySelector(".edit-task").addEventListener("click", () => {
         openModal("Edit Task", [
-            { id: "title", placeholder: "Task title", type: "text", value: t.title }
+            { id: "title", placeholder: "Task title", type: "text", value: t.title },
+            { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
         ], async (vals) => {
             const oldTitle = t.title;
             await updateDoc(doc(db, "tasks", tid), {
                 title: vals.title,
+                color: vals.color,
                 updatedAt: serverTimestamp(),
                 updatedBy: auth.currentUser?.email || "Ẩn danh"
             });
@@ -366,7 +377,7 @@ function renderTask(docSnap) {
 }
 
 
-// MODIFIED TO ADD LOGGING
+// MODIFIED TO ADD LOGGING AND COLOR
 async function addGroup(projectId) {
     openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
         await addDoc(collection(db, "groups"), {
@@ -398,13 +409,15 @@ async function deleteGroup(groupId, g) {
     await deleteDoc(doc(db, "groups", groupId));
 }
 
+// MODIFIED TO ADD COLOR
 function openTaskModal(groupId, projectId) {
     openModal("Thêm Task", [
         { id: "title", placeholder: "Tên Task" },
-        { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" }
+        { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" },
+        { id: "color", label: "Màu", type: "color" }
     ], async (vals) => {
         await addDoc(collection(db, "tasks"), {
-            title: vals.title, comment: vals.comment || "",
+            title: vals.title, comment: vals.comment || "", color: vals.color || null,
             projectId, groupId, status: "todo",
             createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
         });
