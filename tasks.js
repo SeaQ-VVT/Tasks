@@ -1,4 +1,4 @@
-// ========================================================================
+// ========================================================================NEW
 // === Đây là toàn bộ code cho file tasks.js. Bạn có thể thay thế hoàn  ===
 // === toàn file cũ của mình bằng đoạn code này.                          ===
 // ========================================================================
@@ -45,7 +45,6 @@ let isAuthReady = false;
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
   isAuthReady = true;
-  // TODO: Nếu cần thực hiện các hành động ban đầu sau khi xác thực, hãy thêm vào đây
 });
 
 // ===== Helper cho Modal (Popup) =====
@@ -303,7 +302,18 @@ export function showTaskBoard(projectId, projectTitle) {
         <div id="doneCol" class="space-y-3 mt-2 min-h-[200px]"></div>
       </div>
     </div>
+
+    <!-- Biểu đồ tổng tiến độ dự án -->
+    <div id="project-progress-chart-container" class="mt-8 bg-white p-4 rounded shadow">
+        <h3 class="font-bold text-gray-800 mb-2">Tiến độ tổng thể dự án</h3>
+        <canvas id="project-progress-chart" class="w-full h-64"></canvas>
+    </div>
   `;
+
+  // Thêm Chart.js CDN
+  const chartJsScript = document.createElement("script");
+  chartJsScript.src = "https://cdn.jsdelivr.net/npm/chart.js";
+  document.head.appendChild(chartJsScript);
 
   document.getElementById("toggleLogBtn").addEventListener("click", () => {
     const logEntries = document.getElementById("logEntries");
@@ -322,7 +332,88 @@ export function showTaskBoard(projectId, projectTitle) {
   setupGroupListeners(projectId);
   setupDragDrop();
   listenForLogs(projectId);
+  listenForProjectProgress(projectId); // Thêm listener cho tiến độ tổng dự án
 }
+
+// ===== Biểu đồ tổng tiến độ dự án =====
+let projectChart = null;
+let projectHistory = [];
+
+function listenForProjectProgress(projectId) {
+    onSnapshot(collection(db, "tasks"), (snapshot) => {
+        let totalProgress = 0;
+        let totalTasks = 0;
+        snapshot.forEach(doc => {
+            const task = doc.data();
+            if (task.projectId === projectId) {
+                totalProgress += task.progress || 0;
+                totalTasks++;
+            }
+        });
+
+        const currentProgress = totalTasks > 0 ? Math.round(totalProgress / totalTasks) : 0;
+        const now = new Date();
+        const lastEntry = projectHistory[projectHistory.length - 1];
+        
+        // Chỉ thêm dữ liệu nếu tiến độ thay đổi hoặc đủ thời gian
+        if (!lastEntry || lastEntry.progress !== currentProgress || now - lastEntry.timestamp > 60000) { // Cập nhật mỗi phút hoặc khi có thay đổi
+             projectHistory.push({
+                timestamp: now,
+                progress: currentProgress
+            });
+            updateProjectChart();
+        }
+    });
+}
+
+function updateProjectChart() {
+    const ctx = document.getElementById('project-progress-chart').getContext('2d');
+    
+    const labels = projectHistory.map(h => h.timestamp.toLocaleTimeString());
+    const data = projectHistory.map(h => h.progress);
+    
+    if (projectChart) {
+        projectChart.data.labels = labels;
+        projectChart.data.datasets[0].data = data;
+        projectChart.update();
+    } else {
+        projectChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Tiến độ dự án',
+                    data: data,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Tiến độ (%)'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Thời gian'
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
 
 // ===== Tải Groups theo thời gian thực (Realtime Groups) =====
 // Hàm này chỉ tải các group có projectId khớp với projectId hiện tại
@@ -405,8 +496,8 @@ function renderGroup(docSnap) {
     <button class="add-task text-green-600 text-xs mt-1 hover:text-green-700">+ Task</button>
     <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
     
-    <!-- Biểu đồ tiến độ nhóm -->
-    <div class="progress-bar-container mt-4 hidden" id="group-progress-container-${gid}">
+    <!-- Biểu đồ tiến độ nhóm (Luôn hiển thị) -->
+    <div class="progress-bar-container mt-4" id="group-progress-container-${gid}">
       <div class="flex items-center mb-1">
         <span class="text-sm font-semibold text-gray-700 mr-2">Tiến độ nhóm:</span>
         <span id="group-progress-value-${gid}" class="text-sm font-medium text-blue-500">0%</span>
@@ -415,9 +506,6 @@ function renderGroup(docSnap) {
         <div id="group-progress-bar-${gid}" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%;"></div>
       </div>
     </div>
-
-    <!-- Nút bật/tắt biểu đồ -->
-    <button class="toggle-progress-chart-btn text-xs text-blue-500 mt-2 hover:underline">Hiện biểu đồ</button>
   `;
 
   document.getElementById("groupContainer").appendChild(div);
@@ -429,19 +517,6 @@ function renderGroup(docSnap) {
   div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
   div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
   div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
-  
-  // Sự kiện cho nút bật/tắt biểu đồ
-  div.querySelector(".toggle-progress-chart-btn").addEventListener("click", (e) => {
-    const container = document.getElementById(`group-progress-container-${gid}`);
-    const button = e.target;
-    if (container.classList.contains("hidden")) {
-        container.classList.remove("hidden");
-        button.textContent = "Ẩn biểu đồ";
-    } else {
-        container.classList.add("hidden");
-        button.textContent = "Hiện biểu đồ";
-    }
-  });
 }
 
 // ===== Tải Tasks theo thời gian thực (Realtime Tasks) =====
