@@ -1,24 +1,23 @@
 // ===== Firebase SDKs =====
 import {
-  getFirestore,
-  collection,
-  query,
-  onSnapshot,
-  addDoc,
-  doc,
-  updateDoc,
-  deleteDoc,
-  orderBy
+    getFirestore,
+    collection,
+    addDoc,
+    query,
+    where,
+    onSnapshot,
+    doc,
+    deleteDoc,
+    updateDoc,
+    serverTimestamp,
+    getDocs,
+    orderBy,
+    deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
-// 👉 import thêm addProjectLog để ghi lịch sử
-import { showTaskBoard, addProjectLog } from "./tasks.js";
-
-console.log("addproject.js loaded OK");
-
-// ===== Firebase config =====
+// ===== Firebase Config =====
 const firebaseConfig = {
   apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
   authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -28,257 +27,351 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
-// ===== Init Firebase =====
+// ===== Init =====
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
-// ===== DOM elements =====
-const projectArea = document.getElementById("projectArea");
-const addProjectBtn = document.getElementById("addProjectBtn");
-const projectModal = document.getElementById("projectModal");
-const projectModalTitle = document.getElementById("projectModalTitle");
-const projectTitleInput = document.getElementById("projectTitle");
-const projectDescriptionInput = document.getElementById("projectDescription");
-const projectStartInput = document.getElementById("projectStartDate");
-const projectEndInput = document.getElementById("projectEndDate");
-const projectCommentInput = document.getElementById("projectComment");
-const saveProjectBtn = document.getElementById("saveProjectBtn");
-const cancelProjectBtn = document.getElementById("cancelProjectBtn");
-const deleteModal = document.getElementById("deleteModal");
-const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
-const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
-
-let isEditing = false;
-let currentProjectId = null;
-// 👉 để so sánh khi update
-let prevProjectData = null;
-
-// ===== Utility =====
-function showModal(modalId) {
-  document.getElementById(modalId).classList.remove("hidden");
-  document.getElementById(modalId).classList.add("flex");
-}
-function hideModal(modalId) {
-  const modal = document.getElementById(modalId);
-  modal.classList.add("hidden");
-  modal.classList.remove("flex");
-}
-
-// ===== Render project card =====
-function renderProject(docSnap) {
-  const data = docSnap.data();
-  const id = docSnap.id;
-
-  const projectCard = document.createElement("div");
-  projectCard.className =
-    "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-105 mb-4";
-
-  const createdAt = data.createdAt?.toDate
-    ? data.createdAt.toDate().toLocaleString()
-    : "-";
-
-  projectCard.innerHTML = `
-    <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
-    <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
-    <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${data.createdBy || "Không rõ"}</p>
-    <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
-    <div class="flex space-x-2 mt-2">
-      <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">Xem công việc</button>
-      <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">Sửa</button>
-      <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">Xóa</button>
-    </div>
-  `;
-
-  projectArea.appendChild(projectCard);
-}
-
-// ===== Real-time listener =====
-function setupProjectListener() {
-  const projectsCol = collection(db, "projects");
-  const q = query(projectsCol, orderBy("createdAt", "desc"));
-
-  onSnapshot(q, (snapshot) => {
-    projectArea.innerHTML = "";
-    snapshot.forEach((d) => renderProject(d));
-
-    // Edit
-    document.querySelectorAll(".edit-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.target.dataset.id;
-        const docToEdit = snapshot.docs.find((d) => d.id === id);
-        if (docToEdit) {
-          editProject(id, docToEdit.data());
-        }
-      });
-    });
-
-    // Delete
-    document.querySelectorAll(".delete-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.target.dataset.id;
-        showDeleteConfirmation(id);
-      });
-    });
-
-    // View tasks
-    document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.target.dataset.id;
-        showTaskBoard(id);
-      });
-    });
-  });
-}
-
-// ===== Add / Update project =====
-saveProjectBtn.addEventListener("click", async () => {
-  const title = projectTitleInput.value.trim();
-  const description = projectDescriptionInput.value.trim();
-  const startDate = projectStartInput.value;
-  const endDate = projectEndInput.value;
-  const comment = projectCommentInput.value.trim();
-
-  if (!title) {
-    alert("Vui lòng nhập tên dự án.");
-    return;
-  }
-
-  try {
-    const user = auth.currentUser;
-
-    if (isEditing) {
-      const projectDocRef = doc(db, "projects", currentProjectId);
-      await updateDoc(projectDocRef, {
-        title,
-        description,
-        startDate,
-        endDate,
-        comment,
-        updatedAt: new Date()
-      });
-
-      // 👉 log chi tiết thay đổi
-      const changed = [];
-      if (prevProjectData?.title !== title)
-        changed.push(`title: "${prevProjectData?.title}" → "${title}"`);
-      if (prevProjectData?.description !== description)
-        changed.push("description");
-      if (prevProjectData?.startDate !== startDate)
-        changed.push(
-          `startDate: ${prevProjectData?.startDate || "-"} → ${startDate || "-"}`
-        );
-      if (prevProjectData?.endDate !== endDate)
-        changed.push(
-          `endDate: ${prevProjectData?.endDate || "-"} → ${endDate || "-"}`
-        );
-      if (prevProjectData?.comment !== comment) changed.push("comment");
-
-      await addProjectLog(
-        currentProjectId,
-        "update",
-        "Project",
-        changed.join(", ") || "Không thay đổi"
-      );
-    } else {
-      const newRef = await addDoc(collection(db, "projects"), {
-        title,
-        description,
-        startDate,
-        endDate,
-        comment,
-        createdAt: new Date(),
-        createdBy: user ? user.email : "Ẩn danh"
-      });
-      await addProjectLog(
-        newRef.id,
-        "create",
-        "Project",
-        `Tạo dự án "${title}" (#${newRef.id})`
-      );
+// ===== Modal helper =====
+function openModal(title, fields, onSave) {
+    let modal = document.getElementById("popupModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "popupModal";
+        modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden";
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-4 w-96">
+                <h3 id="modalTitle" class="font-semibold mb-2"></h3>
+                <div id="modalFields" class="space-y-2"></div>
+                <div class="flex justify-end space-x-2 mt-3">
+                    <button id="modalCancel" class="px-3 py-1 bg-gray-200 rounded">Hủy</button>
+                    <button id="modalSave" class="px-3 py-1 bg-green-500 text-white rounded">Lưu</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
 
-    // reset & close
-    hideModal("projectModal");
-    projectTitleInput.value = "";
-    projectDescriptionInput.value = "";
-    projectStartInput.value = "";
-    projectEndInput.value = "";
-    projectCommentInput.value = "";
-    prevProjectData = null;
-    isEditing = false;
-  } catch (e) {
-    console.error("Error adding/updating project: ", e);
-  }
-});
+    document.getElementById("modalTitle").textContent = title;
+    const fieldsDiv = document.getElementById("modalFields");
+    fieldsDiv.innerHTML = "";
+    fields.forEach(f => {
+        if (f.type === "textarea") {
+            fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" class="border p-2 w-full">${f.value || ""}</textarea>`;
+        } else {
+            fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full" value="${f.value || ""}">`;
+        }
+    });
 
-// ===== Edit project =====
-function editProject(id, data) {
-  isEditing = true;
-  currentProjectId = id;
-  // 👉 lưu data cũ để log
-  prevProjectData = { ...data };
+    modal.classList.remove("hidden");
 
-  projectModalTitle.textContent = "Cập nhật dự án";
-  projectTitleInput.value = data.title || "";
-  projectDescriptionInput.value = data.description || "";
-  projectStartInput.value = data.startDate || "";
-  projectEndInput.value = data.endDate || "";
-  projectCommentInput.value = data.comment || "";
-
-  showModal("projectModal");
+    document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
+    document.getElementById("modalSave").onclick = () => {
+        const values = {};
+        fields.forEach(f => values[f.id] = document.getElementById(f.id).value);
+        onSave(values);
+        modal.classList.add("hidden");
+    };
 }
 
-// ===== Delete project =====
-function showDeleteConfirmation(id) {
-  currentProjectId = id;
-  showModal("deleteModal");
+// Thêm hàm ghi log
+async function logAction(projectId, action) {
+    const user = auth.currentUser?.email || "Ẩn danh";
+    await addDoc(collection(db, "logs"), {
+        projectId,
+        action,
+        user,
+        timestamp: serverTimestamp()
+    });
 }
 
-confirmDeleteBtn.addEventListener("click", async () => {
-  try {
-    await deleteDoc(doc(db, "projects", currentProjectId));
-    // 👉 log xóa
-    await addProjectLog(
-      currentProjectId,
-      "delete",
-      "Project",
-      `Xóa dự án #${currentProjectId}`
-    );
-    hideModal("deleteModal");
-  } catch (e) {
-    console.error("Error deleting project: ", e);
-  }
-});
+// Thêm hàm lắng nghe log
+function listenForLogs(projectId) {
+    const logsCol = collection(db, "logs");
+    const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
 
-cancelDeleteBtn.addEventListener("click", () => hideModal("deleteModal"));
-cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
+    onSnapshot(q, (snapshot) => {
+        const logEntries = document.getElementById("logEntries");
+        if (!logEntries) return; // Đảm bảo element tồn tại
+        logEntries.innerHTML = "";
+        snapshot.forEach((doc) => {
+            const data = doc.data();
+            const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+            const logItem = document.createElement("div");
+            logItem.textContent = `[${timestamp}] ${data.user} đã ${data.action}.`;
+            logEntries.appendChild(logItem);
+        });
+    });
+}
 
-// ===== Add project modal =====
-addProjectBtn.addEventListener("click", () => {
-  isEditing = false;
-  currentProjectId = null;
-  prevProjectData = null;
 
-  projectModalTitle.textContent = "Tạo dự án mới";
-  projectTitleInput.value = "";
-  projectDescriptionInput.value = "";
-  projectStartInput.value = "";
-  projectEndInput.value = "";
-  projectCommentInput.value = "";
-  showModal("projectModal");
-});
+// ===== Show task board (Đã cập nhật) =====
+export function showTaskBoard(projectId, projectTitle) {
+    const taskBoard = document.getElementById("taskBoard");
 
-// ===== Auth listener =====
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    addProjectBtn.classList.remove("hidden");
-    setupProjectListener();
-  } else {
-    projectArea.innerHTML = "";
-    addProjectBtn.classList.add("hidden");
-  }
-});
+    taskBoard.innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Bạn đang ở dự án: ${projectTitle}</h2>
+        <div class="grid grid-cols-3 gap-4 w-full">
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
+                <h3 class="font-bold text-red-600 mb-2">To Do</h3>
+                <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">+ Group</button>
+                <div id="groupContainer" class="space-y-3 mt-2"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
+                <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
+                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+                <h3 class="font-bold text-green-600 mb-2">Done</h3>
+                <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
+        </div>
+        <div id="logArea" class="mt-8 bg-gray-100 p-4 rounded-lg">
+            <h4 class="font-semibold text-gray-700 mb-2">Nhật ký hoạt động</h4>
+            <div id="logEntries" class="space-y-2 text-sm text-gray-600"></div>
+        </div>
+    `;
+
+    loadGroups(projectId);
+    setupGroupListeners(projectId);
+    setupDragDrop();
+    listenForLogs(projectId); // Bắt đầu lắng nghe log
+}
+
+// ===== Load Groups realtime =====
+function loadGroups(projectId) {
+    const groupsCol = collection(db, "groups");
+    const q = query(groupsCol, where("projectId", "==", projectId));
+
+    onSnapshot(q, (snapshot) => {
+        const groupContainer = document.getElementById("groupContainer");
+        groupContainer.innerHTML = "";
+        snapshot.forEach((docSnap) => renderGroup(docSnap));
+    });
+}
+
+// ===== Render Group =====
+function renderGroup(docSnap) {
+    const g = docSnap.data();
+    const gid = docSnap.id;
+
+    const div = document.createElement("div");
+    div.className = "border rounded p-2 bg-gray-50 shadow";
+    div.id = `group-${gid}`;
+
+    div.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span class="font-semibold text-blue-700">${g.title}</span>
+            <div class="space-x-1">
+                <button class="edit-group text-yellow-600">✏️</button>
+                <button class="delete-group text-red-600">🗑️</button>
+            </div>
+        </div>
+        <button class="add-task text-green-600 text-xs mt-1">+ Task</button>
+        <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
+    `;
+
+    document.getElementById("groupContainer").appendChild(div);
+
+    loadTasks(gid);
+
+    div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
+    div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
+    div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
+}
+
+// ===== Load tasks realtime (cải tiến) =====
+function loadTasks(groupId) {
+    const tasksCol = collection(db, "tasks");
+    const q = query(tasksCol, where("groupId", "==", groupId));
+
+    onSnapshot(q, (snapshot) => {
+        // Duyệt qua các thay đổi
+        snapshot.docChanges().forEach((change) => {
+            const tid = change.doc.id;
+            const oldElement = document.getElementById(`task-${tid}`);
+
+            if (change.type === "added" || change.type === "modified") {
+                // Thêm hoặc cập nhật task
+                if (oldElement) oldElement.remove();
+                renderTask(change.doc);
+            } else if (change.type === "removed") {
+                // Xóa task khỏi giao diện
+                if (oldElement) oldElement.remove();
+            }
+        });
+    });
+}
+
+// ===== Render task row =====
+function renderTask(docSnap) {
+    const t = docSnap.data();
+    const tid = docSnap.id;
+
+    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    const col = document.getElementById(colId);
+    if (!col) return;
+
+    // Xóa bản cũ
+    const old = document.getElementById(`task-${tid}`);
+    if (old) old.remove();
+
+    const hasComment = (t.comment && String(t.comment).trim().length > 0);
+
+    const row = document.createElement("div");
+    row.id = `task-${tid}`;
+    row.className = "flex justify-between items-center bg-gray-100 px-2 py-1 rounded border text-sm cursor-move";
+    row.draggable = true;
+
+    row.innerHTML = `
+        <span class="truncate">${t.title}</span>
+        <div class="space-x-1">
+            <button class="edit-task">✏️</button>
+            <button class="comment-task ${hasComment ? 'text-blue-600 font-bold' : 'text-gray-400'}">💬</button>
+            <button class="delete-task">🗑️</button>
+        </div>
+    `;
+
+    // drag event
+    row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.setData("type", "task");
+        e.dataTransfer.setData("taskId", tid);
+        e.dataTransfer.setData("groupId", t.groupId);
+    });
+
+    // ✅ edit task
+    row.querySelector(".edit-task").addEventListener("click", () => {
+        openModal("Edit Task", [
+            { id: "title", placeholder: "Task title", type: "text", value: t.title }
+        ], async (vals) => {
+            const oldTitle = t.title;
+            await updateDoc(doc(db, "tasks", tid), {
+                title: vals.title,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+            await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+        });
+    });
+
+    // ✅ comment task
+    row.querySelector(".comment-task").addEventListener("click", () => {
+        openModal("Comment Task", [
+            { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+        ], async (vals) => {
+            if (vals.comment && vals.comment.trim().length > 0) {
+                await updateDoc(doc(db, "tasks", tid), {
+                    comment: vals.comment.trim(),
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
+                await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
+            } else {
+                await updateDoc(doc(db, "tasks", tid), {
+                    comment: deleteField(),
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
+                await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+            }
+        });
+    });
+
+    // ✅ delete task
+    row.querySelector(".delete-task").addEventListener("click", async () => {
+        if (confirm("Xóa task này?")) {
+            await deleteDoc(doc(db, "tasks", tid));
+            await logAction(t.projectId, `xóa task "${t.title}"`);
+        }
+    });
+
+    col.appendChild(row);
+}
+
+
+// ===== Group actions (Đã cập nhật) =====
+async function addGroup(projectId) {
+    openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
+        await addDoc(collection(db, "groups"), {
+            title: vals.title, projectId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm group mới "${vals.title}"`);
+    });
+}
+
+async function editGroup(groupId, g) {
+    openModal("Sửa Group", [{ id: "title", placeholder: "Tên", value: g.title }], async (vals) => {
+        await updateDoc(doc(db, "groups", groupId), {
+            title: vals.title, updatedAt: serverTimestamp(),
+            updatedBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(g.projectId, `cập nhật group "${g.title}" thành "${vals.title}"`);
+    });
+}
+
+async function deleteGroup(groupId, g) {
+    if (!confirm("Xóa group này và tất cả task bên trong?")) return;
+
+    const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
+    const tasksToDelete = taskSnap.docs.map(t => t.id);
+    await logAction(g.projectId, `xóa group "${g.title}" và ${tasksToDelete.length} task bên trong`);
+
+    taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
+    await deleteDoc(doc(db, "groups", groupId));
+}
+
+// ===== Task actions (Đã cập nhật) =====
+function openTaskModal(groupId, projectId) {
+    openModal("Thêm Task", [
+        { id: "title", placeholder: "Tên Task" },
+        { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" }
+    ], async (vals) => {
+        await addDoc(collection(db, "tasks"), {
+            title: vals.title, comment: vals.comment || "",
+            projectId, groupId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm task mới "${vals.title}" vào group`);
+    });
+}
+
+// ===== Listeners =====
+function setupGroupListeners(projectId) {
+    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
+}
+
+// ===== Drag & Drop (Đã cập nhật) =====
+function setupDragDrop() {
+    ["inprogressCol", "doneCol"].forEach((colId) => {
+        const col = document.getElementById(colId);
+        if (!col) return;
+
+        col.addEventListener("dragover", (e) => e.preventDefault());
+
+        col.addEventListener("drop", async (e) => {
+            e.preventDefault();
+
+            const type = e.dataTransfer.getData("type");
+            if (type !== "task") return;
+
+            const taskId = e.dataTransfer.getData("taskId");
+            if (!taskId) return;
+
+            const oldGroupId = e.dataTransfer.getData("groupId");
+            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+            
+            // Lấy dữ liệu task trước khi update để ghi log
+            const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
+            const taskData = taskDoc.docs[0].data();
+
+            await updateDoc(doc(db, "tasks", taskId), {
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
+            });
+
+            await logAction(taskData.projectId, `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`);
+        });
+    });
+}
