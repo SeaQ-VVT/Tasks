@@ -301,7 +301,8 @@ function renderTask(docSnap) {
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
-    const hasComment = (t.comment && String(t.comment).trim().length > 0);
+    // Sửa lỗi kiểm tra comment để icon đổi màu đúng
+    const hasComment = t.comment && t.comment.trim().length > 0;
     const borderColor = t.color || '#e5e7eb'; // Default to gray-200 if no color is set
 
     const row = document.createElement("div");
