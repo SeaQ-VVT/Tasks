@@ -104,7 +104,10 @@ function hideModal(modalId) {
   modal.classList.add("hidden");
   modal.classList.remove("flex");
 }
-
+function displayName(email) {
+  if (!email) return "Ẩn danh";
+  return String(email).split("@")[0];
+}
 // ===== Render project card =====
 function renderProject(docSnap) {
   const data = docSnap.data();
@@ -122,7 +125,7 @@ function renderProject(docSnap) {
     <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
     <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
     <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${data.createdBy || "Không rõ"}</p>
+    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
     <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
     <div class="flex space-x-2 mt-2">
       <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
@@ -429,4 +432,5 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
+
 
