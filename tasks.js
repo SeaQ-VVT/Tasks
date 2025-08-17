@@ -694,13 +694,25 @@ function setupDragDrop() {
       if (!taskSnap.exists()) return;
       const taskData = taskSnap.data();
 
-      await updateDoc(taskRef, {
+      // Cập nhật trạng thái và tiến độ
+      const updatePayload = {
         status: newStatus,
         updatedAt: serverTimestamp(),
         updatedBy: currentUser?.email || "Ẩn danh"
-      });
+      };
 
-      await logAction(taskData.projectId, `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`);
+      if (newStatus === "done") {
+        updatePayload.progress = 100;
+      }
+
+      await updateDoc(taskRef, updatePayload);
+
+      // Ghi log hoạt động
+      let logMessage = `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`;
+      if (newStatus === "done") {
+        logMessage += ` và hoàn thành 100%`;
+      }
+      await logAction(taskData.projectId, logMessage);
     });
   });
 }
