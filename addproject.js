@@ -12,7 +12,7 @@ import {
     where
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { showTaskBoard } from "./tasks.js";
 
 // Debug log
@@ -48,7 +48,12 @@ const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 // Initialize Firebase and Auth
 async function initFirebase() {
     try {
-        app = initializeApp(firebaseConfig);
+        // Prevent multiple app initializations
+        if (!getApps().length) {
+            app = initializeApp(firebaseConfig);
+        } else {
+            app = getApps()[0];
+        }
         db = getFirestore(app);
         auth = getAuth(app);
         
@@ -61,10 +66,12 @@ async function initFirebase() {
             } else {
                 console.log("User is not authenticated. Signing in anonymously...");
                 // Attempt to sign in anonymously if not already signed in
-                try {
-                    await signInAnonymously(auth);
-                } catch (e) {
-                    console.error("Error signing in anonymously: ", e);
+                if (!auth.currentUser) {
+                    try {
+                        await signInAnonymously(auth);
+                    } catch (e) {
+                        console.error("Error signing in anonymously: ", e);
+                    }
                 }
                 addProjectBtn.classList.add("hidden");
                 // Stop listening for projects if user logs out
@@ -76,8 +83,8 @@ async function initFirebase() {
             }
         });
         
-        // Use custom token if available, otherwise sign in anonymously
-        if (initialAuthToken) {
+        // Use custom token if available and no user is currently signed in
+        if (initialAuthToken && !auth.currentUser) {
             await signInWithCustomToken(auth, initialAuthToken);
         }
 
