@@ -401,7 +401,10 @@ confirmDeleteBtn.addEventListener("click", async () => {
     const logsSnapshot = await getDocs(logsQuery);
     const logsToDelete = logsSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(logsToDelete);
-
+    // ✅ Delete all progress_history
+    const progressQuery = query(collection(db, "progress_history"), where("projectId", "==", currentProjectId));
+    const progressSnapshot = await getDocs(progressQuery);
+    await Promise.all(progressSnapshot.docs.map((docu) => deleteDoc(docu.ref)));
     // Finally, delete the project document itself
     await deleteDoc(doc(db, "projects", currentProjectId));
 
@@ -436,3 +439,4 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
+
