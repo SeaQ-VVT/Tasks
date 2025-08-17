@@ -348,38 +348,36 @@ export function showTaskBoard(projectId, projectTitle) {
 
 // ===== Biểu đồ tổng tiến độ dự án =====
 let projectChart = null;
-let historyUnsub = null; // Biến listener cho lịch sử
-let tasksProgressUnsub = null; // Biến listener mới cho task
+let progressUnsub = null; // Thêm biến để lưu listener của biểu đồ
 
 function listenForProjectProgress(projectId) {
-    // Hủy listener cũ để tránh lỗi khi chuyển dự án
-    if (historyUnsub) {
-        historyUnsub();
-        historyUnsub = null;
+    // Hủy listener cũ để tránh lỗi dữ liệu
+    if (progressUnsub) {
+        progressUnsub();
+        progressUnsub = null;
     }
-    // Hủy listener cũ cho task
-    if (tasksProgressUnsub) {
-        tasksProgressUnsub();
-        tasksProgressUnsub = null;
+
+    // Hủy biểu đồ cũ để tránh lỗi
+    if (projectChart) {
+      projectChart.destroy();
+      projectChart = null;
     }
 
     // Lắng nghe dữ liệu lịch sử tiến độ từ Firestore
     const historyCol = collection(db, "progress_history");
     const qHistory = query(historyCol, where("projectId", "==", projectId));
     
-    // Thêm listener mới và lưu vào biến
-    historyUnsub = onSnapshot(qHistory, (snapshot) => {
+    progressUnsub = onSnapshot(qHistory, (snapshot) => {
         let projectHistory = [];
         snapshot.forEach(doc => {
             projectHistory.push(doc.data());
         });
         
         projectHistory.sort((a, b) => {
-            // Sắp xếp lại dữ liệu theo timestamp
-            if (a.timestamp && b.timestamp) {
-                return a.timestamp.toDate() - b.timestamp.toDate();
-            }
-            return 0;
+            // Sắp xếp theo timestamp, kiểm tra tính hợp lệ của đối tượng timestamp
+            const dateA = a.timestamp?.toDate ? a.timestamp.toDate() : new Date(0);
+            const dateB = b.timestamp?.toDate ? b.timestamp.toDate() : new Date(0);
+            return dateA - dateB;
         });
         
         updateProjectChart(projectHistory);
@@ -389,8 +387,7 @@ function listenForProjectProgress(projectId) {
     const tasksCol = collection(db, "tasks");
     const qTasks = query(tasksCol, where("projectId", "==", projectId));
 
-    // Thêm listener mới và lưu vào biến
-    tasksProgressUnsub = onSnapshot(qTasks, async (snapshot) => {
+    onSnapshot(qTasks, async (snapshot) => {
         let totalProgress = 0;
         let totalTasks = 0;
         snapshot.forEach(doc => {
@@ -402,22 +399,22 @@ function listenForProjectProgress(projectId) {
         const currentProgress = totalTasks > 0 ? Math.round(totalProgress / totalTasks) : 0;
         
         // Ghi lại tiến độ vào Firestore
-        // Tối ưu: Chỉ ghi khi có thay đổi đáng kể (>1%)
-        const lastRecord = (await getDocs(query(historyCol, where("projectId", "==", projectId)))).docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)[0];
-        if (!lastRecord || Math.abs(lastRecord.progress - currentProgress) > 1) {
-            await addDoc(collection(db, "progress_history"), {
-                projectId,
-                progress: currentProgress,
-                timestamp: serverTimestamp()
-            });
-        }
+        await addDoc(collection(db, "progress_history"), {
+            projectId,
+            progress: currentProgress,
+            timestamp: serverTimestamp()
+        });
     });
 }
 
 function updateProjectChart(projectHistory) {
     const ctx = document.getElementById('project-progress-chart').getContext('2d');
     
-    const labels = projectHistory.map(h => h.timestamp.toDate().toLocaleDateString() + ' ' + h.timestamp.toDate().toLocaleTimeString());
+    const labels = projectHistory.map(h => {
+        // Kiểm tra đối tượng timestamp trước khi gọi toDate()
+        const date = h.timestamp?.toDate ? h.timestamp.toDate() : new Date();
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    });
     const data = projectHistory.map(h => h.progress);
     
     if (projectChart) {
@@ -464,7 +461,7 @@ function updateProjectChart(projectHistory) {
 
 
 // ===== Tải Groups theo thời gian thực (Realtime Groups) =====
-// Hàm này chỉ tải các group có projectId khớp với projectId hiện tại
+// Tải các group có projectId khớp với projectId hiện tại
 // Đây là logic quan trọng để đảm bảo dữ liệu không bị trộn lẫn
 let groupsUnsub = null; // Biến lưu listener để có thể hủy khi đổi dự án
 function loadGroups(projectId) {
@@ -538,7 +535,6 @@ function renderGroup(docSnap) {
       <span class="font-semibold text-blue-700">${g.title}${deadlineText}</span>
       <div class="space-x-1">
         <button class="edit-group text-yellow-600 hover:text-yellow-700" title="Sửa group">✏️</button>
-        <button class="comment-group text-gray-400 hover:text-blue-600" title="Comment">💬</button>
         <button class="delete-group text-red-600 hover:text-red-700" title="Xóa group">🗑️</button>
       </div>
     </div>
@@ -566,7 +562,6 @@ function renderGroup(docSnap) {
   div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
   div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
   div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
-  div.querySelector(".comment-group").addEventListener("click", () => openGroupCommentModal(gid, g));
 }
 
 // ===== Tải Tasks theo thời gian thực (Realtime Tasks) =====
@@ -803,33 +798,9 @@ async function editGroup(groupId, g) {
   });
 }
 
-async function openGroupCommentModal(groupId, g) {
-    openModal("Comment Group", [
-        { id: "comment", placeholder: "Nhập comment", type: "textarea", value: g.comment || "" }
-    ], async (vals) => {
-        if (!isAuthReady) return;
-        if (vals.comment && vals.comment.trim().length > 0) {
-            await updateDoc(doc(db, "groups", groupId), {
-                comment: vals.comment.trim(),
-                updatedAt: serverTimestamp(),
-                updatedBy: currentUser?.email || "Ẩn danh"
-            });
-            await logAction(g.projectId, `thêm comment vào group "${g.title}"`);
-        } else {
-            await updateDoc(doc(db, "groups", groupId), {
-                comment: deleteField(),
-                updatedAt: serverTimestamp(),
-                updatedBy: currentUser?.email || "Ẩn danh"
-            });
-            await logAction(g.projectId, `xóa comment của group "${g.title}"`);
-        }
-    });
-}
-
-
 async function deleteGroup(groupId, g) {
   if (!isAuthReady) return;
-  if (!confirm("Xóa group này và tất cả task bên trong?")) return;
+  if (!confirm("Bạn có chắc muốn xóa group này?")) return;
 
   const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
   const tasksToDelete = taskSnap.docs.map(t => t.id);
@@ -917,3 +888,4 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
