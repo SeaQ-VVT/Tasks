@@ -404,6 +404,20 @@ function renderGroup(docSnap) {
     </div>
     <button class="add-task text-green-600 text-xs mt-1 hover:text-green-700">+ Task</button>
     <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
+    
+    <!-- Biểu đồ tiến độ nhóm -->
+    <div class="progress-bar-container mt-4 hidden" id="group-progress-container-${gid}">
+      <div class="flex items-center mb-1">
+        <span class="text-sm font-semibold text-gray-700 mr-2">Tiến độ nhóm:</span>
+        <span id="group-progress-value-${gid}" class="text-sm font-medium text-blue-500">0%</span>
+      </div>
+      <div class="w-full bg-gray-200 rounded-full h-2">
+        <div id="group-progress-bar-${gid}" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%;"></div>
+      </div>
+    </div>
+
+    <!-- Nút bật/tắt biểu đồ -->
+    <button class="toggle-progress-chart-btn text-xs text-blue-500 mt-2 hover:underline">Hiện biểu đồ</button>
   `;
 
   document.getElementById("groupContainer").appendChild(div);
@@ -415,6 +429,19 @@ function renderGroup(docSnap) {
   div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
   div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
   div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
+  
+  // Sự kiện cho nút bật/tắt biểu đồ
+  div.querySelector(".toggle-progress-chart-btn").addEventListener("click", (e) => {
+    const container = document.getElementById(`group-progress-container-${gid}`);
+    const button = e.target;
+    if (container.classList.contains("hidden")) {
+        container.classList.remove("hidden");
+        button.textContent = "Ẩn biểu đồ";
+    } else {
+        container.classList.add("hidden");
+        button.textContent = "Hiện biểu đồ";
+    }
+  });
 }
 
 // ===== Tải Tasks theo thời gian thực (Realtime Tasks) =====
@@ -425,7 +452,24 @@ function loadTasks(groupId) {
 
   onSnapshot(qTasks, async (snapshot) => {
     const tasks = [];
-    snapshot.forEach((d) => tasks.push({ id: d.id, ...d.data() }));
+    let totalProgress = 0;
+    
+    snapshot.forEach((d) => {
+      const taskData = d.data();
+      tasks.push({ id: d.id, ...taskData });
+      totalProgress += taskData.progress || 0;
+    });
+    
+    const groupProgress = tasks.length > 0 ? Math.round(totalProgress / tasks.length) : 0;
+    
+    // Cập nhật biểu đồ tiến độ nhóm
+    const groupProgressBar = document.getElementById(`group-progress-bar-${groupId}`);
+    const groupProgressValue = document.getElementById(`group-progress-value-${groupId}`);
+    
+    if (groupProgressBar && groupProgressValue) {
+      groupProgressBar.style.width = `${groupProgress}%`;
+      groupProgressValue.textContent = `${groupProgress}%`;
+    }
 
     // Duyệt qua các thay đổi để cập nhật giao diện
     snapshot.docChanges().forEach((change) => {
@@ -724,3 +768,4 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
