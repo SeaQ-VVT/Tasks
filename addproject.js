@@ -11,7 +11,7 @@ import {
     getDocs,
     where
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { showTaskBoard } from "./tasks.js";
 
@@ -27,7 +27,6 @@ const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial
 let app, db, auth;
 let currentProjectId = null;
 let isEditing = false;
-let userCredential = null;
 let projectsUnsubscribe = null;
 
 // DOM elements
@@ -53,29 +52,34 @@ async function initFirebase() {
         db = getFirestore(app);
         auth = getAuth(app);
         
-        if (initialAuthToken) {
-            userCredential = await signInWithCustomToken(auth, initialAuthToken);
-        } else {
-            userCredential = await signInAnonymously(auth);
-        }
-        console.log("Firebase initialized and user authenticated.");
-        
-        // Listen for auth state changes and update UI
-        auth.onAuthStateChanged((user) => {
+        // Listen for auth state changes to handle UI and data loading
+        onAuthStateChanged(auth, async (user) => {
             if (user) {
+                console.log("User is authenticated:", user.uid);
                 addProjectBtn.classList.remove("hidden");
-                // Start listening for projects only after auth is confirmed
-                if (!projectsUnsubscribe) {
-                    listenForProjects();
-                }
+                listenForProjects();
             } else {
+                console.log("User is not authenticated. Signing in anonymously...");
+                // Attempt to sign in anonymously if not already signed in
+                try {
+                    await signInAnonymously(auth);
+                } catch (e) {
+                    console.error("Error signing in anonymously: ", e);
+                }
                 addProjectBtn.classList.add("hidden");
+                // Stop listening for projects if user logs out
                 if (projectsUnsubscribe) {
                     projectsUnsubscribe();
                     projectsUnsubscribe = null;
                 }
+                projectList.innerHTML = "<li>Vui lòng đăng nhập để xem dự án.</li>";
             }
         });
+        
+        // Use custom token if available, otherwise sign in anonymously
+        if (initialAuthToken) {
+            await signInWithCustomToken(auth, initialAuthToken);
+        }
 
     } catch (e) {
         console.error("Error initializing Firebase: ", e);
@@ -109,6 +113,9 @@ function listenForProjects() {
 
     projectsUnsubscribe = onSnapshot(q, (snapshot) => {
         projectList.innerHTML = "";
+        if (snapshot.empty) {
+            projectList.innerHTML = "<li>Không có dự án nào. Vui lòng thêm một dự án mới.</li>";
+        }
         snapshot.forEach((doc) => {
             renderProject(doc);
         });
