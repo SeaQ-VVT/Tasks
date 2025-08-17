@@ -11,7 +11,8 @@ import {
     orderBy,
     where,
     getDocs,
-    deleteField
+    deleteField,
+    getDoc
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -50,6 +51,10 @@ const cancelProjectBtn = document.getElementById("cancelProjectBtn");
 const deleteModal = document.getElementById("deleteModal");
 const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
 const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+const copyModal = document.getElementById("copyModal");
+const newProjectTitleInput = document.getElementById("newProjectTitle");
+const confirmCopyBtn = document.getElementById("confirmCopyBtn");
+const cancelCopyBtn = document.getElementById("cancelCopyBtn");
 
 let isEditing = false;
 let currentProjectId = null;
@@ -89,6 +94,7 @@ function renderProject(doc) {
         <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
         <div class="flex space-x-2 mt-2">
             <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+            <button data-id="${id}" class="copy-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
             <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
             <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
         </div>
@@ -122,6 +128,16 @@ function setupProjectListener() {
             btn.addEventListener("click", (e) => {
                 const id = e.target.dataset.id;
                 showDeleteConfirmation(id);
+            });
+        });
+
+        document.querySelectorAll(".copy-btn").forEach((btn) => {
+            btn.addEventListener("click", (e) => {
+                const id = e.target.dataset.id;
+                const docToCopy = snapshot.docs.find((d) => d.id === id);
+                if (docToCopy) {
+                    copyProject(id, docToCopy.data());
+                }
             });
         });
 
@@ -183,7 +199,7 @@ saveProjectBtn.addEventListener("click", async () => {
         projectStartInput.value = "";
         projectEndInput.value = "";
         projectCommentInput.value = "";
-
+        isEditing = false;
     } catch (e) {
         console.error("Error adding/updating project: ", e);
     }
@@ -203,6 +219,76 @@ function editProject(id, data) {
 
     showModal("projectModal");
 }
+
+
+// ===== Copy project =====
+function copyProject(id, data) {
+    currentProjectId = id;
+    newProjectTitleInput.value = `${data.title} (Bản sao)`;
+    showModal("copyModal");
+}
+
+confirmCopyBtn.addEventListener("click", async () => {
+    const newTitle = newProjectTitleInput.value.trim();
+    if (!newTitle) {
+        console.error("Vui lòng nhập tên cho dự án mới.");
+        return;
+    }
+
+    try {
+        const user = auth.currentUser;
+        const projectDoc = await getDoc(doc(db, "projects", currentProjectId));
+        const projectData = projectDoc.data();
+        
+        // Step 1: Create a new project document with the new title
+        const newProjectRef = await addDoc(collection(db, "projects"), {
+            ...projectData,
+            title: newTitle,
+            createdAt: new Date(),
+            createdBy: user ? user.email : "Ẩn danh",
+        });
+        const newProjectId = newProjectRef.id;
+
+        // Step 2: Find and copy all tasks associated with the old project
+        const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
+        const tasksSnapshot = await getDocs(tasksQuery);
+        const tasksToCopy = tasksSnapshot.docs.map(taskDoc => {
+            const data = taskDoc.data();
+            // Assign the new projectId to the copied task
+            return addDoc(collection(db, "tasks"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(tasksToCopy);
+
+        // Step 3: Find and copy all logs associated with the old project
+        const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
+        const logsSnapshot = await getDocs(logsQuery);
+        const logsToCopy = logsSnapshot.docs.map(logDoc => {
+            const data = logDoc.data();
+            // Assign the new projectId to the copied log
+            return addDoc(collection(db, "logs"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(logsToCopy);
+
+        // Step 4: Find and copy all groups associated with the old project
+        const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
+        const groupsSnapshot = await getDocs(groupsQuery);
+        const groupsToCopy = groupsSnapshot.docs.map(groupDoc => {
+            const data = groupDoc.data();
+            // Assign the new projectId to the copied group
+            return addDoc(collection(db, "groups"), { ...data, projectId: newProjectId });
+        });
+        await Promise.all(groupsToCopy);
+
+        hideModal("copyModal");
+        console.log("Project and all associated data copied successfully!");
+
+    } catch (e) {
+        console.error("Error copying project: ", e);
+    }
+});
+
+cancelCopyBtn.addEventListener("click", () => hideModal("copyModal"));
+
 
 // ===== Delete project and associated data =====
 function showDeleteConfirmation(id) {
