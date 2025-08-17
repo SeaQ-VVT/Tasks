@@ -88,13 +88,13 @@ async function logAction(projectId, action) {
 // ===== LISTEN AND DISPLAY LOGS FUNCTION =====
 function listenForLogs(projectId) {
     const logsCol = collection(db, "logs");
-    // Removed orderBy to avoid index errors on Firestore.
-    // The logs will be displayed as they are received.
-    const q = query(logsCol, where("projectId", "==", projectId));
+    const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
 
     onSnapshot(q, (snapshot) => {
         const logEntries = document.getElementById("logEntries");
         if (!logEntries) return;
+        
+        // Clear and re-populate with latest data
         logEntries.innerHTML = "";
         snapshot.forEach((doc) => {
             const data = doc.data();
@@ -106,13 +106,22 @@ function listenForLogs(projectId) {
     });
 }
 
-// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA) =====
+// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA AND TOGGLE BUTTON) =====
 export function showTaskBoard(projectId, projectTitle) {
     const taskBoard = document.getElementById("taskBoard");
 
     taskBoard.innerHTML = `
         <h2 class="text-xl font-bold mb-4">Bạn đang ở dự án: ${projectTitle}</h2>
-        <div class="grid grid-cols-3 gap-4 w-full">
+        
+        <div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
+                <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs">Ẩn log</button>
+            </div>
+            <div id="logEntries" class="space-y-2 text-sm text-gray-600"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 w-full mt-4">
             <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
                 <h3 class="font-bold text-red-600 mb-2">To Do</h3>
                 <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">+ Group</button>
@@ -127,11 +136,20 @@ export function showTaskBoard(projectId, projectTitle) {
                 <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
             </div>
         </div>
-        <div id="logArea" class="mt-8 bg-gray-100 p-4 rounded-lg">
-            <h4 class="font-semibold text-gray-700 mb-2">Nhật ký hoạt động</h4>
-            <div id="logEntries" class="space-y-2 text-sm text-gray-600"></div>
-        </div>
     `;
+
+    // Add event listener for the log toggle button
+    document.getElementById("toggleLogBtn").addEventListener("click", () => {
+        const logEntries = document.getElementById("logEntries");
+        const button = document.getElementById("toggleLogBtn");
+        if (logEntries.style.display === "none") {
+            logEntries.style.display = "block";
+            button.textContent = "Ẩn log";
+        } else {
+            logEntries.style.display = "none";
+            button.textContent = "Hiện log";
+        }
+    });
 
     loadGroups(projectId);
     setupGroupListeners(projectId);
