@@ -181,7 +181,7 @@ function listenForLogs(projectId) {
 // ===== DEADLINE CONFIG (đổi 1 chỗ là xong) =====
 const DEADLINE_CFG = {
   thresholds: [14, 7, 3], // <=14 cam, <=7 vàng, <=3 đỏ
-classes: ["ring-2 ring-orange-300", "ring-2 ring-yellow-400", "ring-2 ring-red-500"],
+  classes: ["ring-2 ring-orange-300", "ring-2 ring-yellow-400", "ring-2 ring-red-500"],
 };
 
 // ===== Deadline helpers & màu cảnh báo =====
@@ -660,7 +660,3 @@ function setupDragDrop() {
 function setupGroupListeners(projectId) {
   document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
-
-
-
-
