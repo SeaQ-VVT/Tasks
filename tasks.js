@@ -74,7 +74,7 @@ function openModal(title, fields, onSave) {
     };
 }
 
-// ===== THÊM HÀM GHI LOG VÀO ĐÂY =====
+// ===== HÀM GHI LOG =====
 async function logAction(projectId, action) {
     const user = auth.currentUser?.email || "Ẩn danh";
     await addDoc(collection(db, "logs"), {
@@ -85,14 +85,14 @@ async function logAction(projectId, action) {
     });
 }
 
-// ===== THÊM HÀM LẮNG NGHE LOG VÀO ĐÂY =====
+// ===== HÀM LẮNG NGHE VÀ HIỂN THỊ LOG =====
 function listenForLogs(projectId) {
     const logsCol = collection(db, "logs");
     const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
 
     onSnapshot(q, (snapshot) => {
         const logEntries = document.getElementById("logEntries");
-        if (!logEntries) return; // Đảm bảo element tồn tại
+        if (!logEntries) return;
         logEntries.innerHTML = "";
         snapshot.forEach((doc) => {
             const data = doc.data();
@@ -104,7 +104,7 @@ function listenForLogs(projectId) {
     });
 }
 
-// ===== SỬA HÀM showTaskBoard =====
+// ===== HÀM SHOW TASK BOARD (ĐÃ CẬP NHẬT ĐỂ CÓ VÙNG LOG) =====
 export function showTaskBoard(projectId, projectTitle) {
     const taskBoard = document.getElementById("taskBoard");
 
@@ -134,7 +134,7 @@ export function showTaskBoard(projectId, projectTitle) {
     loadGroups(projectId);
     setupGroupListeners(projectId);
     setupDragDrop();
-    listenForLogs(projectId); // Bắt đầu lắng nghe log
+    listenForLogs(projectId);
 }
 
 // ===== Load Groups realtime =====
