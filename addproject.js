@@ -89,6 +89,8 @@ function ensureCopyModal() {
 // ===== State =====
 let isEditing = false;
 let currentProjectId = null;
+// >>> NEW: nhớ dự án đang mở để không bị nhảy sang dự án khác khi realtime update
+let openedProjectId = null;
 
 // ===== Utility =====
 function showModal(modalId) {
@@ -108,6 +110,7 @@ function displayName(email) {
   if (!email) return "Ẩn danh";
   return String(email).split("@")[0];
 }
+
 // ===== Render project card =====
 function renderProject(docSnap) {
   const data = docSnap.data();
@@ -143,12 +146,13 @@ function setupProjectListener() {
   const q = query(projectsCol, orderBy("createdAt", "desc"));
 
   onSnapshot(q, (snapshot) => {
-    projectArea.innerHTML = ""; // Clear the old list
+    // Chỉ render lại danh sách thẻ dự án, KHÔNG đụng taskBoard
+    projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
       renderProject(doc);
     });
 
-    // Add event listeners for the buttons
+    // Events
     document.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const id = e.currentTarget.dataset.id;
@@ -182,6 +186,7 @@ function setupProjectListener() {
         const docToView = snapshot.docs.find((d) => d.id === id);
         if (docToView) {
           const projectTitle = docToView.data().title;
+          openedProjectId = id; // nhớ dự án đang mở
           console.log("Viewing tasks for project:", id);
           showTaskBoard(id, projectTitle);
         }
@@ -234,7 +239,7 @@ saveProjectBtn.addEventListener("click", async () => {
     projectStartInput.value = "";
     projectEndInput.value = "";
     projectCommentInput.value = "";
-    // Giữ nguyên logic hiện có, không ép reset isEditing tại đây.
+    // giữ nguyên isEditing theo flow hiện tại
 
   } catch (e) {
     console.error("Error adding/updating project: ", e);
@@ -356,7 +361,6 @@ if (confirmCopyBtn) {
         })
       );
 
-
       hideModal("copyModal");
       console.log("Đã sao chép dự án và toàn bộ dữ liệu liên quan thành công!");
 
@@ -432,5 +436,3 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
-
-
