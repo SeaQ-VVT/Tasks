@@ -79,6 +79,48 @@ function getUserDisplayName(email) {
     return email.split('@')[0];
 }
 
+// ===== Show Toast Notification =====
+function showToast(message) {
+    let toastContainer = document.getElementById("toastContainer");
+    if (!toastContainer) {
+        toastContainer = document.createElement("div");
+        toastContainer.id = "toastContainer";
+        toastContainer.className = "fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-2";
+        document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl animate-fade-in-up transition-opacity duration-500 ease-in-out";
+    toast.textContent = message;
+
+    // Add CSS for fade-in animation
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes fadeInUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+
+    toastContainer.appendChild(toast);
+
+    // Fade out and remove after 5 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 5000);
+}
+
 // ===== LOGGING FUNCTION =====
 async function logAction(projectId, action) {
     const user = auth.currentUser?.email || "Ẩn danh";
@@ -99,7 +141,7 @@ function listenForLogs(projectId) {
         const logEntries = document.getElementById("logEntries");
         if (!logEntries) return;
         
-        // Sort the logs by timestamp in descending order using JavaScript
+        // Cập nhật nhật ký hoạt động
         const logs = [];
         snapshot.forEach((doc) => {
             logs.push(doc.data());
@@ -114,6 +156,15 @@ function listenForLogs(projectId) {
             const logItem = document.createElement("div");
             logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
             logEntries.appendChild(logItem);
+        });
+
+        // Hiển thị thông báo nhỏ cho các thay đổi mới
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const userDisplayName = getUserDisplayName(data.user);
+                showToast(`${userDisplayName} đã ${data.action}.`);
+            }
         });
     });
 }
