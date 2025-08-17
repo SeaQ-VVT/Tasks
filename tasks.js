@@ -402,11 +402,15 @@ function listenForProjectProgress(projectId) {
         const currentProgress = totalTasks > 0 ? Math.round(totalProgress / totalTasks) : 0;
         
         // Ghi lại tiến độ vào Firestore
-        await addDoc(collection(db, "progress_history"), {
-            projectId,
-            progress: currentProgress,
-            timestamp: serverTimestamp()
-        });
+        // Tối ưu: Chỉ ghi khi có thay đổi đáng kể (>1%)
+        const lastRecord = (await getDocs(query(historyCol, where("projectId", "==", projectId)))).docs.map(doc => doc.data()).sort((a,b) => b.timestamp - a.timestamp)[0];
+        if (!lastRecord || Math.abs(lastRecord.progress - currentProgress) > 1) {
+            await addDoc(collection(db, "progress_history"), {
+                projectId,
+                progress: currentProgress,
+                timestamp: serverTimestamp()
+            });
+        }
     });
 }
 
@@ -534,6 +538,7 @@ function renderGroup(docSnap) {
       <span class="font-semibold text-blue-700">${g.title}${deadlineText}</span>
       <div class="space-x-1">
         <button class="edit-group text-yellow-600 hover:text-yellow-700" title="Sửa group">✏️</button>
+        <button class="comment-group text-gray-400 hover:text-blue-600" title="Comment">💬</button>
         <button class="delete-group text-red-600 hover:text-red-700" title="Xóa group">🗑️</button>
       </div>
     </div>
@@ -561,6 +566,7 @@ function renderGroup(docSnap) {
   div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
   div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
   div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
+  div.querySelector(".comment-group").addEventListener("click", () => openGroupCommentModal(gid, g));
 }
 
 // ===== Tải Tasks theo thời gian thực (Realtime Tasks) =====
@@ -796,6 +802,30 @@ async function editGroup(groupId, g) {
     applyGroupColor(groupId, newData);
   });
 }
+
+async function openGroupCommentModal(groupId, g) {
+    openModal("Comment Group", [
+        { id: "comment", placeholder: "Nhập comment", type: "textarea", value: g.comment || "" }
+    ], async (vals) => {
+        if (!isAuthReady) return;
+        if (vals.comment && vals.comment.trim().length > 0) {
+            await updateDoc(doc(db, "groups", groupId), {
+                comment: vals.comment.trim(),
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser?.email || "Ẩn danh"
+            });
+            await logAction(g.projectId, `thêm comment vào group "${g.title}"`);
+        } else {
+            await updateDoc(doc(db, "groups", groupId), {
+                comment: deleteField(),
+                updatedAt: serverTimestamp(),
+                updatedBy: currentUser?.email || "Ẩn danh"
+            });
+            await logAction(g.projectId, `xóa comment của group "${g.title}"`);
+        }
+    });
+}
+
 
 async function deleteGroup(groupId, g) {
   if (!isAuthReady) return;
