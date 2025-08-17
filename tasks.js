@@ -74,7 +74,7 @@ function openModal(title, fields, onSave) {
     };
 }
 
-// Thêm hàm ghi log
+// ===== THÊM HÀM GHI LOG VÀO ĐÂY =====
 async function logAction(projectId, action) {
     const user = auth.currentUser?.email || "Ẩn danh";
     await addDoc(collection(db, "logs"), {
@@ -85,7 +85,7 @@ async function logAction(projectId, action) {
     });
 }
 
-// Thêm hàm lắng nghe log
+// ===== THÊM HÀM LẮNG NGHE LOG VÀO ĐÂY =====
 function listenForLogs(projectId) {
     const logsCol = collection(db, "logs");
     const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
@@ -104,8 +104,7 @@ function listenForLogs(projectId) {
     });
 }
 
-
-// ===== Show task board (Đã cập nhật) =====
+// ===== SỬA HÀM showTaskBoard =====
 export function showTaskBoard(projectId, projectTitle) {
     const taskBoard = document.getElementById("taskBoard");
 
@@ -182,25 +181,22 @@ function renderGroup(docSnap) {
 
 // ===== Load tasks realtime (cải tiến) =====
 function loadTasks(groupId) {
-    const tasksCol = collection(db, "tasks");
-    const q = query(tasksCol, where("groupId", "==", groupId));
+    const tasksCol = collection(db, "tasks");
+    const q = query(tasksCol, where("groupId", "==", groupId));
 
-    onSnapshot(q, (snapshot) => {
-        // Duyệt qua các thay đổi
-        snapshot.docChanges().forEach((change) => {
-            const tid = change.doc.id;
-            const oldElement = document.getElementById(`task-${tid}`);
+    onSnapshot(q, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            const tid = change.doc.id;
+            const oldElement = document.getElementById(`task-${tid}`);
 
-            if (change.type === "added" || change.type === "modified") {
-                // Thêm hoặc cập nhật task
-                if (oldElement) oldElement.remove();
-                renderTask(change.doc);
-            } else if (change.type === "removed") {
-                // Xóa task khỏi giao diện
-                if (oldElement) oldElement.remove();
-            }
-        });
-    });
+            if (change.type === "added" || change.type === "modified") {
+                if (oldElement) oldElement.remove();
+                renderTask(change.doc);
+            } else if (change.type === "removed") {
+                if (oldElement) oldElement.remove();
+            }
+        });
+    });
 }
 
 // ===== Render task row =====
@@ -212,7 +208,6 @@ function renderTask(docSnap) {
     const col = document.getElementById(colId);
     if (!col) return;
 
-    // Xóa bản cũ
     const old = document.getElementById(`task-${tid}`);
     if (old) old.remove();
 
@@ -232,14 +227,13 @@ function renderTask(docSnap) {
         </div>
     `;
 
-    // drag event
     row.addEventListener("dragstart", (e) => {
         e.dataTransfer.setData("type", "task");
         e.dataTransfer.setData("taskId", tid);
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    // ✅ edit task
+    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
     row.querySelector(".edit-task").addEventListener("click", () => {
         openModal("Edit Task", [
             { id: "title", placeholder: "Task title", type: "text", value: t.title }
@@ -254,7 +248,7 @@ function renderTask(docSnap) {
         });
     });
 
-    // ✅ comment task
+    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
     row.querySelector(".comment-task").addEventListener("click", () => {
         openModal("Comment Task", [
             { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
@@ -277,7 +271,7 @@ function renderTask(docSnap) {
         });
     });
 
-    // ✅ delete task
+    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
     row.querySelector(".delete-task").addEventListener("click", async () => {
         if (confirm("Xóa task này?")) {
             await deleteDoc(doc(db, "tasks", tid));
@@ -289,7 +283,7 @@ function renderTask(docSnap) {
 }
 
 
-// ===== Group actions (Đã cập nhật) =====
+// SỬA CÁC HÀM DƯỚI ĐÂY ĐỂ GHI LOG
 async function addGroup(projectId) {
     openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
         await addDoc(collection(db, "groups"), {
@@ -321,7 +315,6 @@ async function deleteGroup(groupId, g) {
     await deleteDoc(doc(db, "groups", groupId));
 }
 
-// ===== Task actions (Đã cập nhật) =====
 function openTaskModal(groupId, projectId) {
     openModal("Thêm Task", [
         { id: "title", placeholder: "Tên Task" },
@@ -336,12 +329,7 @@ function openTaskModal(groupId, projectId) {
     });
 }
 
-// ===== Listeners =====
-function setupGroupListeners(projectId) {
-    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
-}
-
-// ===== Drag & Drop (Đã cập nhật) =====
+// SỬA ĐOẠN DRAG & DROP ĐỂ GHI LOG
 function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
@@ -358,10 +346,8 @@ function setupDragDrop() {
             const taskId = e.dataTransfer.getData("taskId");
             if (!taskId) return;
 
-            const oldGroupId = e.dataTransfer.getData("groupId");
             const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
             
-            // Lấy dữ liệu task trước khi update để ghi log
             const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
             const taskData = taskDoc.docs[0].data();
 
@@ -374,4 +360,9 @@ function setupDragDrop() {
             await logAction(taskData.projectId, `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`);
         });
     });
+}
+
+// ===== Listeners =====
+function setupGroupListeners(projectId) {
+    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
