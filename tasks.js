@@ -147,26 +147,38 @@ async function logAction(projectId, action) {
   });
 }
 
+// đặt ở phạm vi file (bên ngoài hàm) để giữ unsubscribe
+let logsUnsub = null;
+
 function listenForLogs(projectId) {
+  // nếu đã có listener cũ thì hủy trước (tránh 2 listener chạy song song)
+  if (logsUnsub) { logsUnsub(); logsUnsub = null; }
+
   const logsCol = collection(db, "logs");
   const q = query(logsCol, where("projectId", "==", projectId));
 
-  onSnapshot(q, (snapshot) => {
+  let initial = true; // -> bỏ qua lần bắn đầu
+
+  logsUnsub = onSnapshot(q, (snapshot) => {
     const logEntries = document.getElementById("logEntries");
-    if (!logEntries) return;
+    if (logEntries) {
+      const logs = [];
+      snapshot.forEach((doc) => logs.push(doc.data()));
+      // giữ cách hiển thị cũ
+      logs.sort((a, b) => b.timestamp - a.timestamp);
 
-    const logs = [];
-    snapshot.forEach((doc) => logs.push(doc.data()));
-    logs.sort((a, b) => b.timestamp - a.timestamp);
+      logEntries.innerHTML = "";
+      logs.forEach((data) => {
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+        const userDisplayName = getUserDisplayName(data.user);
+        const logItem = document.createElement("div");
+        logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
+        logEntries.appendChild(logItem);
+      });
+    }
 
-    logEntries.innerHTML = "";
-    logs.forEach((data) => {
-      const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
-      const userDisplayName = getUserDisplayName(data.user);
-      const logItem = document.createElement("div");
-      logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
-      logEntries.appendChild(logItem);
-    });
+    // --- CHỐT: chỉ toast từ lần thứ 2 trở đi (tức là log mới phát sinh) ---
+    if (initial) { initial = false; return; }
 
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
@@ -669,3 +681,4 @@ function setupDragDrop() {
 function setupGroupListeners(projectId) {
   document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
+
