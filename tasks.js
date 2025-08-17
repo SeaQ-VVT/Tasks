@@ -10,7 +10,8 @@ import {
     deleteDoc,
     updateDoc,
     serverTimestamp,
-    getDocs
+    getDocs,
+    deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
@@ -30,257 +31,491 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// ===== DOM elements =====
-const taskBoard = document.getElementById("taskBoard");
-const projectTitleDisplay = document.getElementById("projectTitleDisplay");
-const taskProgressContainer = document.getElementById("taskProgressContainer");
-const taskProgressBar = document.getElementById("taskProgressBar");
-const taskProgressText = document.getElementById("taskProgressText");
-const groupList = document.getElementById("groupList");
-const addGroupBtn = document.getElementById("addGroupBtn");
-
-// ===== Global state variables =====
-let currentProjectId = null;
-let currentProjectTitle = null;
-let groupsUnsubscribe = null;
-
-// ===== Main function to show the task board =====
-export function showTaskBoard(projectId, projectTitle) {
-    if (!projectId || !projectTitle) {
-        console.error("Project ID or Title is missing!");
-        return;
+// ===== Modal helper (UPDATED) =====
+function openModal(title, fields, onSave) {
+    let modal = document.getElementById("popupModal");
+    if (!modal) {
+        modal = document.createElement("div");
+        modal.id = "popupModal";
+        modal.className = "fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden";
+        modal.innerHTML = `
+            <div class="bg-white rounded-lg p-4 w-96">
+                <h3 id="modalTitle" class="font-semibold mb-2"></h3>
+                <div id="modalFields" class="space-y-2"></div>
+                <div class="flex justify-end space-x-2 mt-3">
+                    <button id="modalCancel" class="px-3 py-1 bg-gray-200 rounded">Hủy</button>
+                    <button id="modalSave" class="px-3 py-1 bg-green-500 text-white rounded">Lưu</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
     }
+
+    document.getElementById("modalTitle").textContent = title;
+    const fieldsDiv = document.getElementById("modalFields");
+    fieldsDiv.innerHTML = "";
+    fields.forEach(f => {
+        if (f.type === "textarea") {
+            fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" class="border p-2 w-full">${f.value || ""}</textarea>`;
+        } else if (f.type === "color") {
+            fieldsDiv.innerHTML += `
+                <div class="flex items-center space-x-2">
+                    <label for="${f.id}" class="text-gray-700 w-20">${f.label}:</label>
+                    <input id="${f.id}" type="color" class="border p-1 w-full" value="${f.value || "#000000"}">
+                </div>
+            `;
+        } else if (f.type === "range") {
+             fieldsDiv.innerHTML += `
+                <div class="flex flex-col">
+                    <label for="${f.id}" class="text-gray-700">${f.label} (<span id="progress-value">${f.value || 0}</span>%)</label>
+                    <input id="${f.id}" type="range" min="0" max="100" value="${f.value || 0}" class="w-full">
+                </div>
+            `;
+        }
+        else {
+            fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full" value="${f.value || ""}">`;
+        }
+    });
+
+    modal.classList.remove("hidden");
     
-    currentProjectId = projectId;
-    currentProjectTitle = projectTitle;
+    // Add listener for range input
+    const progressInput = document.getElementById("progress");
+    if (progressInput) {
+        const progressValueSpan = document.getElementById("progress-value");
+        progressInput.addEventListener("input", (e) => {
+            progressValueSpan.textContent = e.target.value;
+        });
+    }
 
-    projectTitleDisplay.textContent = projectTitle;
-    taskBoard.classList.remove("hidden");
-    document.getElementById("projectArea").classList.add("hidden");
 
+    document.getElementById("modalCancel").onclick = () => modal.classList.add("hidden");
+    document.getElementById("modalSave").onclick = () => {
+        const values = {};
+        fields.forEach(f => values[f.id] = document.getElementById(f.id).value);
+        onSave(values);
+        modal.classList.add("hidden");
+    };
+}
+
+// ===== Get user display name from email =====
+function getUserDisplayName(email) {
+    if (!email) return "Ẩn danh";
+    return email.split('@')[0];
+}
+
+// ===== Show Toast Notification =====
+function showToast(message) {
+    let toastContainer = document.getElementById("toastContainer");
+    if (!toastContainer) {
+        toastContainer = document.createElement("div");
+        toastContainer.id = "toastContainer";
+        toastContainer.className = "fixed bottom-4 right-4 z-50 flex flex-col-reverse space-y-2";
+        document.body.appendChild(toastContainer);
+    }
+
+    const toast = document.createElement("div");
+    toast.className = "bg-blue-600 text-white px-4 py-2 rounded-lg shadow-xl animate-fade-in-up transition-opacity duration-500 ease-in-out";
+    toast.textContent = message;
+
+    // Add CSS for fade-in animation
+    const style = document.createElement("style");
+    style.innerHTML = `
+      @keyframes fadeInUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+      .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease-in-out;
+      }
+    `;
+    document.head.appendChild(style);
+
+    toastContainer.appendChild(toast);
+
+    // Fade out and remove after 5 seconds
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 500);
+    }, 5000);
+}
+
+// ===== LOGGING FUNCTION =====
+async function logAction(projectId, action) {
+    const user = auth.currentUser?.email || "Ẩn danh";
+    await addDoc(collection(db, "logs"), {
+        projectId,
+        action,
+        user,
+        timestamp: serverTimestamp()
+    });
+}
+
+// ===== LISTEN AND DISPLAY LOGS FUNCTION =====
+function listenForLogs(projectId) {
+    const logsCol = collection(db, "logs");
+    const q = query(logsCol, where("projectId", "==", projectId));
+
+    onSnapshot(q, (snapshot) => {
+        const logEntries = document.getElementById("logEntries");
+        if (!logEntries) return;
+        
+        // Cập nhật nhật ký hoạt động
+        const logs = [];
+        snapshot.forEach((doc) => {
+            logs.push(doc.data());
+        });
+
+        logs.sort((a, b) => b.timestamp - a.timestamp);
+        
+        logEntries.innerHTML = "";
+        logs.forEach((data) => {
+            const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+            const userDisplayName = getUserDisplayName(data.user);
+            const logItem = document.createElement("div");
+            logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
+            logEntries.appendChild(logItem);
+        });
+
+        // Hiển thị thông báo nhỏ cho các thay đổi mới
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const data = change.doc.data();
+                const userDisplayName = getUserDisplayName(data.user);
+                showToast(`${userDisplayName} đã ${data.action}.`);
+            }
+        });
+    });
+}
+
+// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA AND TOGGLE BUTTON) =====
+export function showTaskBoard(projectId, projectTitle) {
+    const taskBoard = document.getElementById("taskBoard");
+
+    taskBoard.innerHTML = `
+        <h2 class="text-xl font-bold mb-4">Bạn đang ở dự án: ${projectTitle}</h2>
+        
+        <div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
+            <div class="flex justify-between items-center mb-2">
+                <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
+                <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs">Hiện log</button>
+            </div>
+            <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 w-full mt-4">
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
+                <h3 class="font-bold text-red-600 mb-2">To Do</h3>
+                <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs">+ Group</button>
+                <div id="groupContainer" class="space-y-3 mt-2"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
+                <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
+                <div id="inprogressCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
+            <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+                <h3 class="font-bold text-green-600 mb-2">Done</h3>
+                <div id="doneCol" class="space-y-2 mt-2 min-h-[200px]"></div>
+            </div>
+        </div>
+    `;
+
+    // Add event listener for the log toggle button
+    document.getElementById("toggleLogBtn").addEventListener("click", () => {
+        const logEntries = document.getElementById("logEntries");
+        const button = document.getElementById("toggleLogBtn");
+        if (logEntries.classList.contains("hidden")) {
+            logEntries.classList.remove("hidden");
+            button.textContent = "Ẩn log";
+        } else {
+            logEntries.classList.add("hidden");
+            button.textContent = "Hiện log";
+        }
+    });
+
+    loadGroups(projectId);
     setupGroupListeners(projectId);
-    listenForGroups(projectId);
     setupDragDrop();
+    listenForLogs(projectId);
 }
 
-// ===== Show / Hide UI =====
-function showModal(modalId) {
-    document.getElementById(modalId).classList.remove('hidden');
-    document.getElementById(modalId).classList.add('flex');
-}
-
-function hideModal(modalId) {
-    const modal = document.getElementById(modalId);
-    modal.classList.add('hidden');
-    modal.classList.remove('flex');
-}
-
-// ===== Firestore Listeners =====
-function listenForGroups(projectId) {
+// ===== Load Groups realtime =====
+function loadGroups(projectId) {
     const groupsCol = collection(db, "groups");
     const q = query(groupsCol, where("projectId", "==", projectId));
 
-    if (groupsUnsubscribe) groupsUnsubscribe();
-
-    groupsUnsubscribe = onSnapshot(q, (snapshot) => {
-        groupList.innerHTML = "";
-        snapshot.forEach((groupDoc) => {
-            renderGroup(groupDoc.id, groupDoc.data());
-        });
+    onSnapshot(q, (snapshot) => {
+        const groupContainer = document.getElementById("groupContainer");
+        groupContainer.innerHTML = "";
+        snapshot.forEach((docSnap) => renderGroup(docSnap));
     });
-
-    // We also need a listener for all tasks in the project to calculate progress
-    listenForTasks(projectId);
 }
 
-function listenForTasks(projectId) {
+// ===== Render Group =====
+function renderGroup(docSnap) {
+    const g = docSnap.data();
+    const gid = docSnap.id;
+
+    const div = document.createElement("div");
+    div.className = "border rounded p-2 bg-gray-50 shadow";
+    div.id = `group-${gid}`;
+
+    div.innerHTML = `
+        <div class="flex justify-between items-center">
+            <span class="font-semibold text-blue-700">${g.title}</span>
+            <div class="space-x-1">
+                <button class="edit-group text-yellow-600">✏️</button>
+                <button class="delete-group text-red-600">🗑️</button>
+            </div>
+        </div>
+        <button class="add-task text-green-600 text-xs mt-1">+ Task</button>
+        <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
+    `;
+
+    document.getElementById("groupContainer").appendChild(div);
+
+    loadTasks(gid);
+
+    div.querySelector(".add-task").addEventListener("click", () => openTaskModal(gid, g.projectId));
+    div.querySelector(".edit-group").addEventListener("click", () => editGroup(gid, g));
+    div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
+}
+
+// ===== Load tasks realtime with docChanges() (FIXED) =====
+function loadTasks(groupId) {
     const tasksCol = collection(db, "tasks");
-    const q = query(tasksCol, where("projectId", "==", projectId));
+    const q = query(tasksCol, where("groupId", "==", groupId));
 
     onSnapshot(q, (snapshot) => {
-        let totalTasks = 0;
-        let doneTasks = 0;
+        snapshot.docChanges().forEach((change) => {
+            const docSnap = change.doc;
+            const tid = docSnap.id;
+            
+            // Xóa element cũ nếu đã tồn tại để tránh trùng lặp
+            const oldElement = document.getElementById(`task-${tid}`);
+            if (oldElement) {
+                oldElement.remove();
+            }
 
-        snapshot.forEach((taskDoc) => {
-            totalTasks++;
-            if (taskDoc.data().status === "done") {
-                doneTasks++;
+            if (change.type === "added" || change.type === "modified") {
+                // Thêm hoặc cập nhật task mới vào đúng vị trí
+                renderTask(docSnap);
+            } else if (change.type === "removed") {
+                // Xử lý khi task bị xóa
+                // Đã xử lý ở trên
             }
         });
-
-        const progress = totalTasks > 0 ? (doneTasks / totalTasks) * 100 : 0;
-        updateProgress(progress);
     });
 }
 
-function updateProgress(percentage) {
-    taskProgressContainer.classList.remove("hidden");
-    taskProgressBar.style.width = `${percentage}%`;
-    taskProgressText.textContent = `${Math.round(percentage)}% Hoàn thành`;
-    
-    // Change color based on progress
-    if (percentage === 100) {
-        taskProgressBar.classList.remove("bg-blue-500", "bg-yellow-500");
-        taskProgressBar.classList.add("bg-green-500");
-    } else if (percentage > 0) {
-        taskProgressBar.classList.remove("bg-green-500");
-        taskProgressBar.classList.add("bg-yellow-500");
-    } else {
-        taskProgressBar.classList.remove("bg-green-500", "bg-yellow-500");
-        taskProgressBar.classList.add("bg-blue-500");
-    }
-}
+// ===== Render task row (UPDATED) =====
+function renderTask(docSnap) {
+    const t = docSnap.data();
+    const tid = docSnap.id;
 
-function renderGroup(groupId, groupData) {
-    const groupCard = document.createElement("div");
-    groupCard.className = "bg-gray-100 p-4 rounded-lg shadow-md w-80 flex-shrink-0";
-    groupCard.innerHTML = `
-        <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center">
-            ${groupData.name}
-            <div class="flex space-x-2">
-                <button class="add-task-btn text-blue-500 hover:text-blue-700 text-xl" data-group-id="${groupId}">+</button>
-                <button class="delete-group-btn text-red-500 hover:text-red-700 text-sm" data-group-id="${groupId}">&times;</button>
+    let colId = t.status === "todo" ? `tasks-${t.groupId}` : `${t.status}Col`;
+    const col = document.getElementById(colId);
+    if (!col) return;
+
+    // Check if the element already exists to avoid duplication
+    let row = document.getElementById(`task-${tid}`);
+    if (!row) {
+        row = document.createElement("div");
+        row.id = `task-${tid}`;
+        row.className = "flex flex-col bg-gray-100 px-2 py-1 rounded text-sm cursor-move";
+        row.style.borderLeft = `4px solid ${t.color || '#e5e7eb'}`;
+        row.draggable = true;
+
+        row.innerHTML = `
+            <div class="flex justify-between items-center w-full">
+                <span class="truncate">${t.title}</span>
+                <div class="space-x-1">
+                    <button class="edit-task">✏️</button>
+                    <button class="comment-task">💬</button>
+                    <button class="delete-task">🗑️</button>
+                </div>
             </div>
-        </h3>
-        <div id="tasks-${groupId}" class="task-list space-y-2 min-h-[50px]"></div>
-    `;
-    groupList.appendChild(groupCard);
-
-    // Listen for tasks within this group
-    const tasksQuery = query(collection(db, "tasks"), where("groupId", "==", groupId));
-    onSnapshot(tasksQuery, (snapshot) => {
-        const taskList = document.getElementById(`tasks-${groupId}`);
-        taskList.innerHTML = "";
-        snapshot.forEach((taskDoc) => {
-            renderTask(taskList, taskDoc.id, taskDoc.data());
-        });
-    });
-
-    // Add event listeners for new buttons
-    groupCard.querySelector(".add-task-btn").addEventListener("click", () => {
-        showAddTaskModal(currentProjectId, groupId);
-    });
-
-    groupCard.querySelector(".delete-group-btn").addEventListener("click", async () => {
-        // Find and delete all tasks in this group before deleting the group
-        const tasksQuery = query(collection(db, "tasks"), where("groupId", "==", groupId));
-        const tasksSnapshot = await getDocs(tasksQuery);
-        const taskDeletions = tasksSnapshot.docs.map(taskDoc => deleteDoc(doc(db, "tasks", taskDoc.id)));
-        await Promise.all(taskDeletions);
+            <div id="progress-container-${tid}" class="mt-1 w-full bg-gray-200 rounded-full h-2.5">
+                <div class="bg-green-600 h-2.5 rounded-full" style="width: ${t.progress || 0}%;"></div>
+            </div>
+        `;
         
-        // Now delete the group
-        await deleteDoc(doc(db, "groups", groupId));
-    });
-}
+        // Append the new row to the correct column
+        col.appendChild(row);
 
-function renderTask(taskList, taskId, taskData) {
-    const taskCard = document.createElement("div");
-    taskCard.className = "bg-white p-3 rounded-md shadow-sm border border-gray-200 text-sm cursor-grab";
-    taskCard.draggable = true;
-    taskCard.id = `task-${taskId}`; // Unique ID for drag/drop
-    taskCard.innerHTML = `
-        <p class="font-medium text-gray-700">${taskData.title}</p>
-        <p class="text-gray-500 text-xs">${taskData.comment || "Không có ghi chú"}</p>
-        <div class="flex justify-end space-x-2 mt-2">
-             <button class="edit-task-btn text-yellow-500 hover:text-yellow-700 text-xs" data-id="${taskId}">Sửa</button>
-             <button class="delete-task-btn text-red-500 hover:text-red-700 text-xs" data-id="${taskId}">Xóa</button>
-        </div>
-    `;
-    taskList.appendChild(taskCard);
+        // Add event listeners only once
+        row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.setData("type", "task");
+            e.dataTransfer.setData("taskId", tid);
+            e.dataTransfer.setData("groupId", t.groupId);
+        });
 
-    // Add drag event listener
-    taskCard.addEventListener("dragstart", (e) => {
-        e.dataTransfer.setData("text/plain", taskId);
-        e.dataTransfer.setData("type", "task");
-    });
-    
-    // Add edit/delete listeners
-    taskCard.querySelector(".edit-task-btn").addEventListener("click", () => {
-        showEditTaskModal(taskId, taskData);
-    });
-    taskCard.querySelector(".delete-task-btn").addEventListener("click", () => {
-        deleteDoc(doc(db, "tasks", taskId));
-    });
-}
+        row.querySelector(".edit-task").addEventListener("click", () => {
+            openModal("Edit Task", [
+                { id: "title", placeholder: "Task title", type: "text", value: t.title },
+                { id: "progress", label: "Tiến độ", type: "range", value: t.progress || 0 },
+                { id: "color", label: "Màu", type: "color", value: t.color || "#000000" }
+            ], async (vals) => {
+                const oldTitle = t.title;
+                const oldProgress = t.progress;
 
-// ===== Modals for adding/editing =====
-function showAddTaskModal(projectId, groupId) {
-    const modal = document.getElementById("taskModal");
-    document.getElementById("taskModalTitle").textContent = "Tạo công việc mới";
-    document.getElementById("taskIdInput").value = "";
-    document.getElementById("taskTitleInput").value = "";
-    document.getElementById("taskCommentInput").value = "";
-    document.getElementById("taskProjectIdInput").value = projectId;
-    document.getElementById("taskGroupIdInput").value = groupId;
+                await updateDoc(doc(db, "tasks", tid), {
+                    title: vals.title,
+                    color: vals.color,
+                    progress: parseInt(vals.progress),
+                    updatedAt: serverTimestamp(),
+                    updatedBy: auth.currentUser?.email || "Ẩn danh"
+                });
 
-    showModal("taskModal");
-}
+                if (oldTitle !== vals.title) {
+                    await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
+                }
+                if (oldProgress !== parseInt(vals.progress)) {
+                     await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
+                }
+            });
+        });
 
-function showEditTaskModal(taskId, taskData) {
-    const modal = document.getElementById("taskModal");
-    document.getElementById("taskModalTitle").textContent = "Sửa công việc";
-    document.getElementById("taskIdInput").value = taskId;
-    document.getElementById("taskTitleInput").value = taskData.title;
-    document.getElementById("taskCommentInput").value = taskData.comment;
-    document.getElementById("taskProjectIdInput").value = taskData.projectId;
-    document.getElementById("taskGroupIdInput").value = taskData.groupId;
-    
-    showModal("taskModal");
-}
+        row.querySelector(".comment-task").addEventListener("click", () => {
+            openModal("Comment Task", [
+                { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
+            ], async (vals) => {
+                if (vals.comment && vals.comment.trim().length > 0) {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: vals.comment.trim(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
+                } else {
+                    await updateDoc(doc(db, "tasks", tid), {
+                        comment: deleteField(),
+                        updatedAt: serverTimestamp(),
+                        updatedBy: auth.currentUser?.email || "Ẩn danh"
+                    });
+                    await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+                }
+            });
+        });
 
-async function saveTask() {
-    const taskId = document.getElementById("taskIdInput").value;
-    const title = document.getElementById("taskTitleInput").value;
-    const comment = document.getElementById("taskCommentInput").value;
-    const projectId = document.getElementById("taskProjectIdInput").value;
-    const groupId = document.getElementById("taskGroupIdInput").value;
-
-    if (!title) {
-        alert("Vui lòng nhập tên công việc.");
-        return;
+        row.querySelector(".delete-task").addEventListener("click", async () => {
+            if (confirm("Xóa task này?")) {
+                await deleteDoc(doc(db, "tasks", tid));
+                await logAction(t.projectId, `xóa task "${t.title}"`);
+            }
+        });
     }
 
-    try {
-        if (taskId) {
-            // Update existing task
-            await updateDoc(doc(db, "tasks", taskId), {
-                title, comment
-            });
-        } else {
-            // Add new task
-            await addDoc(collection(db, "tasks"), {
-                title, comment,
-                projectId, groupId, status: "todo",
-                createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
-            });
-        }
-        hideModal("taskModal");
-    } catch (e) {
-        console.error("Error saving task: ", e);
+    // Luôn cập nhật trạng thái màu sắc của icon comment
+    const hasComment = t.comment && t.comment.trim().length > 0;
+    const commentBtn = row.querySelector(".comment-task");
+    if (hasComment) {
+        commentBtn.classList.remove("text-gray-400");
+        commentBtn.classList.add("text-blue-600", "font-bold");
+    } else {
+        commentBtn.classList.remove("text-blue-600", "font-bold");
+        commentBtn.classList.add("text-gray-400");
+    }
+
+    // Update progress bar
+    const progressBar = row.querySelector(`#progress-container-${tid} div`);
+    if (progressBar) {
+        progressBar.style.width = `${t.progress || 0}%`;
     }
 }
 
-// ===== Drag & Drop =====
+
+// MODIFIED TO ADD LOGGING AND COLOR
+async function addGroup(projectId) {
+    openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
+        await addDoc(collection(db, "groups"), {
+            title: vals.title, projectId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm group mới "${vals.title}"`);
+    });
+}
+
+async function editGroup(groupId, g) {
+    openModal("Sửa Group", [{ id: "title", placeholder: "Tên", value: g.title }], async (vals) => {
+        await updateDoc(doc(db, "groups", groupId), {
+            title: vals.title, updatedAt: serverTimestamp(),
+            updatedBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(g.projectId, `cập nhật group "${g.title}" thành "${vals.title}"`);
+    });
+}
+
+async function deleteGroup(groupId, g) {
+    if (!confirm("Xóa group này và tất cả task bên trong?")) return;
+
+    const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
+    const tasksToDelete = taskSnap.docs.map(t => t.id);
+    await logAction(g.projectId, `xóa group "${g.title}" và ${tasksToDelete.length} task bên trong`);
+
+    taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
+    await deleteDoc(doc(db, "groups", groupId));
+}
+
+// MODIFIED TO ADD COLOR
+function openTaskModal(groupId, projectId) {
+    openModal("Thêm Task", [
+        { id: "title", placeholder: "Tên Task" },
+        { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" },
+        { id: "color", label: "Màu", type: "color" },
+        { id: "progress", label: "Tiến độ", type: "range", value: 0 }
+    ], async (vals) => {
+        await addDoc(collection(db, "tasks"), {
+            title: vals.title, comment: vals.comment || "", color: vals.color || null, progress: parseInt(vals.progress),
+            projectId, groupId, status: "todo",
+            createdAt: serverTimestamp(), createdBy: auth.currentUser?.email || "Ẩn danh"
+        });
+        await logAction(projectId, `thêm task mới "${vals.title}" vào group`);
+    });
+}
+
+// MODIFIED TO ADD LOGGING
 function setupDragDrop() {
-    const todoCol = document.getElementById("todoCol");
-    const inprogressCol = document.getElementById("inprogressCol");
-    const doneCol = document.getElementById("doneCol");
+    ["inprogressCol", "doneCol"].forEach((colId) => {
+        const col = document.getElementById(colId);
+        if (!col) return;
 
-    const columns = [todoCol, inprogressCol, doneCol];
-
-    columns.forEach(col => {
         col.addEventListener("dragover", (e) => e.preventDefault());
+
         col.addEventListener("drop", async (e) => {
             e.preventDefault();
 
-            const taskId = e.dataTransfer.getData("text/plain");
-            const newStatus = col.dataset.status;
+            const type = e.dataTransfer.getData("type");
+            if (type !== "task") return;
 
-            if (!taskId || !newStatus) return;
+            const taskId = e.dataTransfer.getData("taskId");
+            if (!taskId) return;
+
+            const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+            
+            // Fixed the query to get the document by ID.
+            const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
+            if (taskDoc.empty) return;
+            const taskData = taskDoc.docs[0].data();
 
             await updateDoc(doc(db, "tasks", taskId), {
-                status: newStatus
+                status: newStatus,
+                updatedAt: serverTimestamp(),
+                updatedBy: auth.currentUser?.email || "Ẩn danh"
             });
+
+            await logAction(taskData.projectId, `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`);
         });
     });
+}
+
+// ===== Listeners =====
+function setupGroupListeners(projectId) {
+    document.getElementById("addGroupBtn").addEventListener("click", () => addGroup(projectId));
 }
