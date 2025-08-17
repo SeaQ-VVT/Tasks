@@ -179,9 +179,9 @@ export function showTaskBoard(projectId, projectTitle) {
         <div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
             <div class="flex justify-between items-center mb-2">
                 <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
-                <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs">Ẩn log</button>
+                <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs">Hiện log</button>
             </div>
-            <div id="logEntries" class="space-y-2 text-sm text-gray-600"></div>
+            <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
         </div>
 
         <div class="grid grid-cols-3 gap-4 w-full mt-4">
@@ -205,11 +205,11 @@ export function showTaskBoard(projectId, projectTitle) {
     document.getElementById("toggleLogBtn").addEventListener("click", () => {
         const logEntries = document.getElementById("logEntries");
         const button = document.getElementById("toggleLogBtn");
-        if (logEntries.style.display === "none") {
-            logEntries.style.display = "block";
+        if (logEntries.classList.contains("hidden")) {
+            logEntries.classList.remove("hidden");
             button.textContent = "Ẩn log";
         } else {
-            logEntries.style.display = "none";
+            logEntries.classList.add("hidden");
             button.textContent = "Hiện log";
         }
     });
