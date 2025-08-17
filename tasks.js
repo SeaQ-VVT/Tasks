@@ -27,7 +27,7 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
-// ===== Init =====
+// ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
@@ -74,7 +74,7 @@ function openModal(title, fields, onSave) {
     };
 }
 
-// ===== HÀM GHI LOG =====
+// ===== LOGGING FUNCTION =====
 async function logAction(projectId, action) {
     const user = auth.currentUser?.email || "Ẩn danh";
     await addDoc(collection(db, "logs"), {
@@ -85,10 +85,12 @@ async function logAction(projectId, action) {
     });
 }
 
-// ===== HÀM LẮNG NGHE VÀ HIỂN THỊ LOG =====
+// ===== LISTEN AND DISPLAY LOGS FUNCTION =====
 function listenForLogs(projectId) {
     const logsCol = collection(db, "logs");
-    const q = query(logsCol, where("projectId", "==", projectId), orderBy("timestamp", "desc"));
+    // Removed orderBy to avoid index errors on Firestore.
+    // The logs will be displayed as they are received.
+    const q = query(logsCol, where("projectId", "==", projectId));
 
     onSnapshot(q, (snapshot) => {
         const logEntries = document.getElementById("logEntries");
@@ -104,7 +106,7 @@ function listenForLogs(projectId) {
     });
 }
 
-// ===== HÀM SHOW TASK BOARD (ĐÃ CẬP NHẬT ĐỂ CÓ VÙNG LOG) =====
+// ===== RENDER TASK BOARD (UPDATED WITH LOG AREA) =====
 export function showTaskBoard(projectId, projectTitle) {
     const taskBoard = document.getElementById("taskBoard");
 
@@ -179,7 +181,7 @@ function renderGroup(docSnap) {
     div.querySelector(".delete-group").addEventListener("click", () => deleteGroup(gid, g));
 }
 
-// ===== Load tasks realtime (cải tiến) =====
+// ===== Load tasks realtime (improved) =====
 function loadTasks(groupId) {
     const tasksCol = collection(db, "tasks");
     const q = query(tasksCol, where("groupId", "==", groupId));
@@ -233,7 +235,7 @@ function renderTask(docSnap) {
         e.dataTransfer.setData("groupId", t.groupId);
     });
 
-    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
+    // MODIFIED TO ADD LOGGING
     row.querySelector(".edit-task").addEventListener("click", () => {
         openModal("Edit Task", [
             { id: "title", placeholder: "Task title", type: "text", value: t.title }
@@ -248,7 +250,7 @@ function renderTask(docSnap) {
         });
     });
 
-    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
+    // MODIFIED TO ADD LOGGING
     row.querySelector(".comment-task").addEventListener("click", () => {
         openModal("Comment Task", [
             { id: "comment", placeholder: "Nhập comment", type: "textarea", value: t.comment || "" }
@@ -271,7 +273,7 @@ function renderTask(docSnap) {
         });
     });
 
-    // SỬA ĐOẠN NÀY ĐỂ GHI LOG
+    // MODIFIED TO ADD LOGGING
     row.querySelector(".delete-task").addEventListener("click", async () => {
         if (confirm("Xóa task này?")) {
             await deleteDoc(doc(db, "tasks", tid));
@@ -283,7 +285,7 @@ function renderTask(docSnap) {
 }
 
 
-// SỬA CÁC HÀM DƯỚI ĐÂY ĐỂ GHI LOG
+// MODIFIED TO ADD LOGGING
 async function addGroup(projectId) {
     openModal("Thêm Group", [{ id: "title", placeholder: "Tên Group" }], async (vals) => {
         await addDoc(collection(db, "groups"), {
@@ -329,7 +331,7 @@ function openTaskModal(groupId, projectId) {
     });
 }
 
-// SỬA ĐOẠN DRAG & DROP ĐỂ GHI LOG
+// MODIFIED TO ADD LOGGING
 function setupDragDrop() {
     ["inprogressCol", "doneCol"].forEach((colId) => {
         const col = document.getElementById(colId);
@@ -348,7 +350,9 @@ function setupDragDrop() {
 
             const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
             
+            // Fixed the query to get the document by ID.
             const taskDoc = await getDocs(query(collection(db, "tasks"), where("__name__", "==", taskId)));
+            if (taskDoc.empty) return;
             const taskData = taskDoc.docs[0].data();
 
             await updateDoc(doc(db, "tasks", taskId), {
