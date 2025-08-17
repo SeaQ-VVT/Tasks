@@ -348,20 +348,26 @@ export function showTaskBoard(projectId, projectTitle) {
 
 // ===== Biểu đồ tổng tiến độ dự án =====
 let projectChart = null;
-let progressUnsub = null; // Thêm biến để lưu listener của biểu đồ
+let historyUnsub = null; // Biến listener cho lịch sử
+let tasksProgressUnsub = null; // Biến listener mới cho task
 
 function listenForProjectProgress(projectId) {
-    // Hủy listener cũ để tránh lỗi dữ liệu
-    if (progressUnsub) {
-        progressUnsub();
-        progressUnsub = null;
+    // Hủy listener cũ để tránh lỗi khi chuyển dự án
+    if (historyUnsub) {
+        historyUnsub();
+        historyUnsub = null;
+    }
+    // Hủy listener cũ cho task
+    if (tasksProgressUnsub) {
+        tasksProgressUnsub();
+        tasksProgressUnsub = null;
     }
 
     // Lắng nghe dữ liệu lịch sử tiến độ từ Firestore
     const historyCol = collection(db, "progress_history");
     const qHistory = query(historyCol, where("projectId", "==", projectId));
     
-    progressUnsub = onSnapshot(qHistory, (snapshot) => {
+    historyUnsub = onSnapshot(qHistory, (snapshot) => {
         let projectHistory = [];
         snapshot.forEach(doc => {
             projectHistory.push(doc.data());
@@ -376,7 +382,7 @@ function listenForProjectProgress(projectId) {
     const tasksCol = collection(db, "tasks");
     const qTasks = query(tasksCol, where("projectId", "==", projectId));
 
-    onSnapshot(qTasks, async (snapshot) => {
+    tasksProgressUnsub = onSnapshot(qTasks, async (snapshot) => {
         let totalProgress = 0;
         let totalTasks = 0;
         snapshot.forEach(doc => {
