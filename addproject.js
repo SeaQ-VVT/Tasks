@@ -141,7 +141,7 @@ function renderLog(docSnap) {
   const logDiv = document.createElement("div");
   logDiv.className = "p-2 mb-1 rounded-md text-sm";
   let color = "bg-gray-100";
-  let icon = "📝";
+  let icon = "�";
 
   if (logData.action === "thêm") {
     color = "bg-green-100";
@@ -154,7 +154,7 @@ function renderLog(docSnap) {
     icon = "🗑️";
   } else if (logData.action === "sao chép") {
     color = "bg-blue-100";
-    icon = "�";
+    icon = "📋";
   }
 
   logDiv.classList.add(color);
@@ -541,9 +541,9 @@ addProjectBtn.addEventListener("click", () => {
 
 // ===== Auth listener =====
 auth.onAuthStateChanged((user) => {
+  setupProjectListener(); // Luôn chạy để hiển thị dự án
   if (user) {
     addProjectBtn.classList.remove("hidden");
-    setupProjectListener();
     setupLogListener();
     // Ẩn/hiện nút xóa log
     const adminEmail = "admin@example.com";
@@ -553,8 +553,11 @@ auth.onAuthStateChanged((user) => {
       clearLogsBtn.classList.add("hidden");
     }
   } else {
-    projectArea.innerHTML = "";
+    // Không làm gì ở đây, dự án vẫn được hiển thị nhờ dòng trên
     addProjectBtn.classList.add("hidden");
+    if (clearLogsBtn) {
+      clearLogsBtn.classList.add("hidden");
+    }
   }
 });
 
