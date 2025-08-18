@@ -101,7 +101,11 @@ function renderLogs(projectId, container, isAdmin) {
     toggleBtn.textContent = logsDiv.classList.contains("hidden") ? "📜 Hiện log" : "📜 Ẩn log";
   });
 
-  const q = query(collection(db, "project_logs"), where("projectId", "==", projectId), orderBy("createdAt", "desc"));
+  const q = query(
+    collection(db, "project_logs"),
+    where("projectId", "==", projectId),
+    orderBy("createdAt", "desc")
+  );
   onSnapshot(q, (snap) => {
     logsDiv.innerHTML = "";
     snap.forEach((docu) => {
@@ -115,6 +119,7 @@ function renderLogs(projectId, container, isAdmin) {
       `;
       logsDiv.appendChild(item);
     });
+
     if (isAdmin) {
       logsDiv.querySelectorAll(".delete-log-btn").forEach((btn) => {
         btn.addEventListener("click", async (e) => {
@@ -156,6 +161,7 @@ function renderProject(docSnap) {
   btns.className = "flex space-x-2 mt-2";
   btns.innerHTML = `
     <button data-id="${id}" class="view-tasks-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+    <button data-id="${id}" class="copy-btn bg-green-500 text-white px-3 py-1 rounded-md text-sm">📋</button>
     <button data-id="${id}" class="edit-btn bg-yellow-500 text-white px-3 py-1 rounded-md text-sm">✏️</button>
     <button data-id="${id}" class="delete-btn bg-red-500 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
   `;
@@ -182,6 +188,16 @@ function setupProjectListener() {
       btn.addEventListener("click", (e) => {
         const id = e.currentTarget.dataset.id;
         showDeleteConfirmation(id);
+      });
+    });
+
+    document.querySelectorAll(".copy-btn").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        const id = e.currentTarget.dataset.id;
+        const docToCopy = snapshot.docs.find((d) => d.id === id);
+        if (docToCopy) {
+          await copyProject(id, docToCopy.data());
+        }
       });
     });
 
@@ -241,6 +257,28 @@ function editProject(id, data) {
   projectEndInput.value = data.endDate || "";
   projectCommentInput.value = data.comment || "";
   showModal("projectModal");
+}
+
+// ===== Copy project =====
+async function copyProject(id, data) {
+  const user = auth.currentUser;
+  const newTitle = `${data.title} (Copy)`;
+
+  try {
+    const { createdAt, updatedAt, createdBy, ...rest } = data;
+    const newProjectRef = await addDoc(collection(db, "projects"), {
+      ...rest,
+      title: newTitle,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: user ? user.email : "Ẩn danh"
+    });
+
+    await addProjectLog(newProjectRef.id, "sao chép dự án", `từ (${data.title}) sang (${newTitle})`);
+    console.log("Đã sao chép dự án thành công!");
+  } catch (e) {
+    console.error("Lỗi khi sao chép dự án:", e);
+  }
 }
 
 // ===== Delete project =====
