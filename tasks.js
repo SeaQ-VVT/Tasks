@@ -287,23 +287,30 @@ export function showTaskBoard(projectId, projectTitle) {
       <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
     </div>
 
+    <!-- Cập nhật lớp Tailwind cho các cột để có cùng chiều cao và thanh cuộn -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
-<div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
-  <div class="flex justify-between items-center mb-2">
-    <h3 class="font-bold text-red-600">To Do</h3>
-    <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
-      + Group
-    </button>
-  </div>
-  <div id="groupContainer" class="space-y-3 mt-2"></div>
-</div>
-      <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
-        <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
-        <div id="inprogressCol" class="space-y-3 mt-2 min-h-[200px]"></div>
+      <!-- Cột To Do -->
+      <div class="bg-white p-3 rounded shadow flex flex-col">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-bold text-red-600">To Do</h3>
+          <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
+            + Group
+          </button>
+        </div>
+        <!-- Thêm chiều cao cố định và thanh cuộn cho group container -->
+        <div id="groupContainer" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
       </div>
-      <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+      <!-- Cột In Progress -->
+      <div class="bg-white p-3 rounded shadow flex flex-col">
+        <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
+        <!-- Thêm chiều cao cố định và thanh cuộn cho cột In Progress -->
+        <div id="inprogressCol" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
+      </div>
+      <!-- Cột Done -->
+      <div class="bg-white p-3 rounded shadow flex flex-col">
         <h3 class="font-bold text-green-600 mb-2">Done</h3>
-        <div id="doneCol" class="space-y-3 mt-2 min-h-[200px]"></div>
+        <!-- Thêm chiều cao cố định và thanh cuộn cho cột Done -->
+        <div id="doneCol" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
       </div>
     </div>
 
@@ -892,5 +899,3 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
-
-
