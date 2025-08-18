@@ -149,18 +149,28 @@ function formatDateVN(yyyy_mm_dd) {
 }
 
 // ===== Nhật ký hoạt động (Logs) =====
-async function logAction(projectId, action, extra = {}) {
-  if (!isAuthReady) return;
+async function logAction(projectId, action, groupId = null) {
+  if (!isAuthReady) return; // Đảm bảo người dùng đã xác thực
+
   const user = currentUser?.email || "Ẩn danh";
+  let logMessage = action;
+
+  // Lấy thông tin group nếu có
+  if (groupId) {
+    const groupSnap = await getDoc(doc(db, "groups", groupId));
+    if (groupSnap.exists()) {
+      const groupData = groupSnap.data();
+      logMessage += ` trong group "${groupData.title}"`;
+    }
+  }
+
   await addDoc(collection(db, "logs"), {
     projectId,
-    action,
+    action: logMessage,
     user,
-    ...extra,   // thêm thông tin chi tiết
     timestamp: serverTimestamp()
   });
 }
-
 
 // Biến lưu trữ listener logs để có thể hủy khi đổi dự án
 let logsUnsub = null;
@@ -194,20 +204,16 @@ function listenForLogs(projectId) {
       });
     }
 
- //   if (initial) {
-  //    initial = false;
-  //    return;
-  //  }
+    if (initial) {
+      initial = false;
+      return;
+    }
 
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         const data = change.doc.data();
         const userDisplayName = getUserDisplayName(data.user);
-        if (data.type === "updateTask") {
-  showToast(`${userDisplayName} đã sửa task "${data.taskTitle}" trong group ${data.groupId}`);
-} else {
-  showToast(`${userDisplayName} đã ${data.action}`);
-}
+        showToast(`${userDisplayName} đã ${data.action}.`);
       }
     });
   });
@@ -701,16 +707,11 @@ function renderTask(docSnap) {
           updatedBy: currentUser?.email || "Ẩn danh"
         });
 
-     if (oldTitle !== vals.title) {
-  await logAction(
-    t.projectId,
-    `cập nhật task "${oldTitle}" thành "${vals.title}"`,
-    { type: "updateTask", taskId: tid, taskTitle: vals.title, groupId: t.groupId }
-  );
-}
-
+        if (oldTitle !== vals.title) {
+          await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`, t.groupId);
+        }
         if (oldProgress !== parseInt(vals.progress)) {
-          await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
+          await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`, t.groupId);
         }
       });
     });
@@ -726,14 +727,14 @@ function renderTask(docSnap) {
             updatedAt: serverTimestamp(),
             updatedBy: currentUser?.email || "Ẩn danh"
           });
-          await logAction(t.projectId, `thêm comment vào task "${t.title}"`);
+          await logAction(t.projectId, `thêm comment vào task "${t.title}"`, t.groupId);
         } else {
           await updateDoc(doc(db, "tasks", tid), {
             comment: deleteField(),
             updatedAt: serverTimestamp(),
             updatedBy: currentUser?.email || "Ẩn danh"
           });
-          await logAction(t.projectId, `xóa comment của task "${t.title}"`);
+          await logAction(t.projectId, `xóa comment của task "${t.title}"`, t.groupId);
         }
       });
     });
@@ -742,7 +743,7 @@ function renderTask(docSnap) {
     row.querySelector(".delete-task").addEventListener("click", async () => {
       if (confirm("Bạn có chắc muốn xóa task này?")) {
         await deleteDoc(doc(db, "tasks", tid));
-        await logAction(t.projectId, `xóa task "${t.title}"`);
+        await logAction(t.projectId, `xóa task "${t.title}"`, t.groupId);
       }
     });
   }
@@ -770,7 +771,7 @@ async function addGroup(projectId) {
   ], async (vals) => {
     if (!isAuthReady) return;
     const deadline = vals.deadline && vals.deadline.trim() ? vals.deadline.trim() : null;
-    await addDoc(collection(db, "groups"), {
+    const newDocRef = await addDoc(collection(db, "groups"), {
       title: vals.title,
       projectId,
       status: "todo",
@@ -781,7 +782,7 @@ async function addGroup(projectId) {
 
     await logAction(projectId,
       `thêm group mới "${vals.title}"` +
-      (deadline ? ` (deadline ${formatDateVN(deadline)})` : ``)
+      (deadline ? ` (deadline ${formatDateVN(deadline)})` : ``), newDocRef.id
     );
   });
 }
@@ -805,14 +806,14 @@ async function editGroup(groupId, g) {
     await updateDoc(doc(db, "groups", groupId), payload);
 
     if (g.title !== vals.title) {
-      await logAction(g.projectId, `cập nhật group "${g.title}" thành "${vals.title}"`);
+      await logAction(g.projectId, `cập nhật group "${g.title}" thành "${vals.title}"`, groupId);
     }
     if (!oldDeadline && newDeadline) {
-      await logAction(g.projectId, `đặt deadline cho group "${vals.title}" là ${formatDateVN(newDeadline)}`);
+      await logAction(g.projectId, `đặt deadline cho group "${vals.title}" là ${formatDateVN(newDeadline)}`, groupId);
     } else if (oldDeadline && newDeadline && oldDeadline !== newDeadline) {
-      await logAction(g.projectId, `đổi deadline group "${vals.title}" từ ${formatDateVN(oldDeadline)} sang ${formatDateVN(newDeadline)}`);
+      await logAction(g.projectId, `đổi deadline group "${vals.title}" từ ${formatDateVN(oldDeadline)} sang ${formatDateVN(newDeadline)}`, groupId);
     } else if (oldDeadline && !newDeadline) {
-      await logAction(g.projectId, `xóa deadline của group "${vals.title}"`);
+      await logAction(g.projectId, `xóa deadline của group "${vals.title}"`, groupId);
     }
 
     const newData = { ...g, ...payload };
@@ -826,7 +827,7 @@ async function deleteGroup(groupId, g) {
 
   const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
   const tasksToDelete = taskSnap.docs.map(t => t.id);
-  await logAction(g.projectId, `xóa group "${g.title}" và ${tasksToDelete.length} task bên trong`);
+  await logAction(g.projectId, `xóa group "${g.title}" và ${tasksToDelete.length} task bên trong`, groupId);
 
   taskSnap.forEach(async (t) => await deleteDoc(doc(db, "tasks", t.id)));
   await deleteDoc(doc(db, "groups", groupId));
@@ -852,7 +853,7 @@ function openTaskModal(groupId, projectId) {
       createdAt: serverTimestamp(),
       createdBy: currentUser?.email || "Ẩn danh"
     });
-    await logAction(projectId, `thêm task mới "${vals.title}" vào group`);
+    await logAction(projectId, `thêm task mới "${vals.title}"`, groupId);
   });
 }
 
@@ -879,6 +880,7 @@ function setupDragDrop() {
       const taskSnap = await getDoc(taskRef);
       if (!taskSnap.exists()) return;
       const taskData = taskSnap.data();
+      const groupData = (await getDoc(doc(db, "groups", taskData.groupId))).data();
 
       // Cập nhật trạng thái và tiến độ
       const updatePayload = {
@@ -898,6 +900,7 @@ function setupDragDrop() {
       if (newStatus === "done") {
         logMessage += ` và hoàn thành 100%`;
       }
+      logMessage += ` trong group "${groupData.title}"`;
       await logAction(taskData.projectId, logMessage);
     });
   });
@@ -910,5 +913,3 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
-
-
