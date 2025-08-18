@@ -53,7 +53,7 @@
 <body class="bg-gray-100 p-4 pt-20">
   <!-- Navigation Bar -->
   <div class="nav-bar" id="navBar">
-    <h1 class="text-xl font-bold">User & Project Management</h1>
+    <h1 class="text-xl font-bold">Task Manager</h1>
     <div class="flex items-center space-x-4">
       <div id="status" class="text-sm">Not logged in</div>
       <div id="navButtons" class="flex items-center space-x-4 hidden">
@@ -313,7 +313,7 @@
       const isAdmin = email === ADMIN_EMAIL;
 
       // Display username (without domain suffix)
-      status.textContent = `Account: ${displayName(email)}   Role: ${isAdmin ? "Admin" : "User"}`;
+      status.textContent = `Account: ${displayName(email)}`;
 
       if (isAdmin) {
         showCreateUserModalBtn.classList.remove('hidden');
@@ -385,3 +385,4 @@
   <script type="module" src="tasks.js"></script>
 </body>
 </html>
+
