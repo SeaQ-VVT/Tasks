@@ -298,19 +298,19 @@ export function showTaskBoard(projectId, projectTitle) {
           </button>
         </div>
         <!-- Thêm chiều cao cố định và thanh cuộn cho group container -->
-        <div id="groupContainer" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
+        <div id="groupContainer" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
       </div>
       <!-- Cột In Progress -->
       <div class="bg-white p-3 rounded shadow flex flex-col">
         <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
         <!-- Thêm chiều cao cố định và thanh cuộn cho cột In Progress -->
-        <div id="inprogressCol" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
+        <div id="inprogressCol" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
       </div>
       <!-- Cột Done -->
       <div class="bg-white p-3 rounded shadow flex flex-col">
         <h3 class="font-bold text-green-600 mb-2">Done</h3>
         <!-- Thêm chiều cao cố định và thanh cuộn cho cột Done -->
-        <div id="doneCol" class="space-y-3 mt-2 h-[10cm] overflow-y-auto"></div>
+        <div id="doneCol" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
       </div>
     </div>
 
@@ -899,3 +899,4 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
