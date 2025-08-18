@@ -288,11 +288,15 @@ export function showTaskBoard(projectId, projectTitle) {
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
-      <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
-        <h3 class="font-bold text-red-600 mb-2">To Do</h3>
-        <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">+ Group</button>
-        <div id="groupContainer" class="space-y-3 mt-2"></div>
-      </div>
+<div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
+  <div class="flex justify-between items-center mb-2">
+    <h3 class="font-bold text-red-600">To Do</h3>
+    <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
+      + Group
+    </button>
+  </div>
+  <div id="groupContainer" class="space-y-3 mt-2"></div>
+</div>
       <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
         <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
         <div id="inprogressCol" class="space-y-3 mt-2 min-h-[200px]"></div>
@@ -888,4 +892,5 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
