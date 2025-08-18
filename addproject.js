@@ -291,6 +291,8 @@ function setupProjectListener() {
         }
       });
     });
+  }, (error) => {
+    console.error("Lỗi khi lắng nghe dự án:", error);
   });
 }
 
