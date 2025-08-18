@@ -10,7 +10,6 @@ import {
   deleteDoc,
   orderBy,
   where,
-  getDocs,
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
@@ -84,7 +83,10 @@ async function addProjectLog(projectId, action, details = "") {
   });
 }
 
-function renderLogs(projectId, container, isAdmin) {
+function renderLogs(projectId, container) {
+  const user = auth.currentUser;
+  const isAdmin = user && user.email === "admin@gmail.com"; // đổi mail admin
+
   const logWrapper = document.createElement("div");
   logWrapper.className = "border p-2 mb-2 rounded bg-gray-50";
   logWrapper.innerHTML = `
@@ -154,8 +156,7 @@ function renderProject(docSnap) {
   projectArea.appendChild(projectCard);
 
   // render log riêng trên cùng
-  const isAdmin = auth.currentUser?.email === "admin@gmail.com"; // check admin
-  renderLogs(id, projectCard, isAdmin);
+  renderLogs(id, projectCard);
 
   // buttons
   const btns = document.createElement("div");
