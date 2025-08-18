@@ -203,7 +203,11 @@ function listenForLogs(projectId) {
       if (change.type === "added") {
         const data = change.doc.data();
         const userDisplayName = getUserDisplayName(data.user);
-        showToast(`${userDisplayName} đã ${data.action}.`);
+        if (data.type === "updateTask") {
+  showToast(`${userDisplayName} đã sửa task "${data.taskTitle}" trong group ${data.groupId}`);
+} else {
+  showToast(`${userDisplayName} đã ${data.action}`);
+}
       }
     });
   });
@@ -697,9 +701,14 @@ function renderTask(docSnap) {
           updatedBy: currentUser?.email || "Ẩn danh"
         });
 
-        if (oldTitle !== vals.title) {
-          await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`);
-        }
+     if (oldTitle !== vals.title) {
+  await logAction(
+    t.projectId,
+    `cập nhật task "${oldTitle}" thành "${vals.title}"`,
+    { type: "updateTask", taskId: tid, taskTitle: vals.title, groupId: t.groupId }
+  );
+}
+
         if (oldProgress !== parseInt(vals.progress)) {
           await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`);
         }
@@ -901,4 +910,5 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
