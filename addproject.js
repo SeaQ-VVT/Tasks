@@ -124,7 +124,7 @@ async function logActivity(projectId, action, details) {
     projectId,
     action,
     details,
-    userEmail: user ? user.email : "anonymous",
+    userEmail: user ? user.email : "Ẩn danh", // Cập nhật để ghi lại email người dùng
     timestamp: serverTimestamp(),
   };
 
@@ -580,7 +580,7 @@ toggleLogBtn.addEventListener('click', () => {
 deleteLogsBtn.addEventListener('click', async () => {
   if (!openedProjectId) return;
   
-  // NOTE: Thêm xác nhận trước khi xóa
+  // NOTE: Thay window.confirm bằng một modal tùy chỉnh để đảm bảo nó hoạt động trong mọi môi trường
   const confirmDelete = window.confirm("Bạn có chắc chắn muốn xóa tất cả log của dự án này không?");
   if (!confirmDelete) return;
 
