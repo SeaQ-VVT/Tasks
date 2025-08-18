@@ -404,7 +404,6 @@ confirmDeleteBtn.addEventListener("click", async () => {
     
     // Finally, delete the project document itself
     await deleteDoc(doc(db, "projects", currentProjectId));
-    // 🔻 THÊM 4 DÒNG NÀY Ở ĐÂY
     if (openedProjectId === currentProjectId) {
       const taskBoard = document.getElementById("taskBoard");
       if (taskBoard) taskBoard.innerHTML = "";
