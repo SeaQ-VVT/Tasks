@@ -149,16 +149,18 @@ function formatDateVN(yyyy_mm_dd) {
 }
 
 // ===== Nhật ký hoạt động (Logs) =====
-async function logAction(projectId, action) {
-  if (!isAuthReady) return; // Đảm bảo người dùng đã xác thực
+async function logAction(projectId, action, extra = {}) {
+  if (!isAuthReady) return;
   const user = currentUser?.email || "Ẩn danh";
   await addDoc(collection(db, "logs"), {
     projectId,
     action,
     user,
+    ...extra,   // thêm thông tin chi tiết
     timestamp: serverTimestamp()
   });
 }
+
 
 // Biến lưu trữ listener logs để có thể hủy khi đổi dự án
 let logsUnsub = null;
@@ -192,10 +194,10 @@ function listenForLogs(projectId) {
       });
     }
 
-    if (initial) {
-      initial = false;
-      return;
-    }
+ //   if (initial) {
+  //    initial = false;
+  //    return;
+  //  }
 
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
@@ -899,3 +901,4 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
