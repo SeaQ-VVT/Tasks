@@ -10,14 +10,17 @@ import {
   deleteDoc,
   orderBy,
   where,
+  getDocs,
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { showTaskBoard } from "./tasks.js";
 
-// ===== Firebase config =====
+// Import showTaskBoard
+import { showTaskBoard } from "./tasks.js"; // Giả định file tasks.js tồn tại và có hàm này
+
+// ===== Firebase config and Init Firebase =====
 const firebaseConfig = {
   apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
   authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -27,7 +30,6 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
-// ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -53,6 +55,13 @@ let isEditing = false;
 let currentProjectId = null;
 let openedProjectId = null;
 
+// Lấy appId từ biến toàn cục
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// Sử dụng đường dẫn collection đúng
+const projectsCollection = `artifacts/${appId}/public/data/projects`;
+const logsCollection = `artifacts/${appId}/public/data/project_logs`;
+
 // ===== Utility =====
 function showModal(modalId) {
   const el = document.getElementById(modalId);
@@ -74,19 +83,21 @@ function displayName(email) {
 // ===== LOG SYSTEM =====
 async function addProjectLog(projectId, action, details = "") {
   const user = auth.currentUser;
-  await addDoc(collection(db, "project_logs"), {
-    projectId,
-    action,
-    details,
-    user: user ? user.email : "Ẩn danh",
-    createdAt: serverTimestamp()
-  });
+  try {
+    await addDoc(collection(db, logsCollection), {
+      projectId,
+      action,
+      details,
+      user: user ? user.email : "Ẩn danh",
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.error("Error adding log:", e);
+  }
 }
 
-function renderLogs(projectId, container) {
-  const user = auth.currentUser;
-  const isAdmin = user && user.email === "admin@gmail.com"; // đổi mail admin
-
+// Hàm renderLogs đã được sửa lại để lắng nghe một cách hiệu quả hơn
+function renderLogs(projectId, container, isAdmin) {
   const logWrapper = document.createElement("div");
   logWrapper.className = "border p-2 mb-2 rounded bg-gray-50";
   logWrapper.innerHTML = `
@@ -104,7 +115,7 @@ function renderLogs(projectId, container) {
   });
 
   const q = query(
-    collection(db, "project_logs"),
+    collection(db, logsCollection),
     where("projectId", "==", projectId),
     orderBy("createdAt", "desc")
   );
@@ -113,7 +124,7 @@ function renderLogs(projectId, container) {
     logsDiv.innerHTML = "";
     snap.forEach((docu) => {
       const log = docu.data();
-      const time = log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString() : "-";
+      const time = log.createdAt?.toDate ? log.createdAt.toDate().toLocaleString('vi-VN') : "-";
       const item = document.createElement("div");
       item.className = "text-sm border-b py-1 flex justify-between";
       item.innerHTML = `
@@ -122,189 +133,244 @@ function renderLogs(projectId, container) {
       `;
       logsDiv.appendChild(item);
     });
-
-    if (isAdmin) {
-      logsDiv.querySelectorAll(".delete-log-btn").forEach((btn) => {
-        btn.addEventListener("click", async (e) => {
-          const logId = e.currentTarget.dataset.id;
-          await deleteDoc(doc(db, "project_logs", logId));
-        });
-      });
-    }
+  }, (error) => {
+      console.error("Error getting project logs:", error);
+      logsDiv.innerHTML = `<p class="text-red-500 text-sm">Lỗi khi tải lịch sử hoạt động.</p>`;
   });
+  
+  // SỬA: Gắn sự kiện ủy quyền cho các nút xóa log chỉ một lần
+  if (isAdmin) {
+    logWrapper.addEventListener("click", async (e) => {
+      const targetBtn = e.target.closest(".delete-log-btn");
+      if (!targetBtn) return;
+      const logId = targetBtn.dataset.id;
+      try {
+          await deleteDoc(doc(db, logsCollection, logId));
+      } catch (error) {
+          console.error("Lỗi khi xóa log:", error);
+      }
+    });
+  }
 }
 
 // ===== Render project card =====
 function renderProject(docSnap) {
   const data = docSnap.data();
   const id = docSnap.id;
+  const user = auth.currentUser;
+  const isAdmin = user && user.email === "admin@gmail.com";
+  const isOwner = user && data.createdBy === user.email;
 
   const projectCard = document.createElement("div");
   projectCard.className = "bg-white p-6 rounded-lg shadow-md border mb-4";
+  projectCard.dataset.projectId = id;
 
-  const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
-
+  const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString('vi-VN') : "-";
+  const updatedAt = data.updatedAt?.toDate ? data.updatedAt.toDate().toLocaleString('vi-VN') : "-";
+  
   projectCard.innerHTML = `
     <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
     <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
-    <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
-    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
-    <p class="text-gray-500 text-sm"><b>Ngày tạo:</b> ${createdAt}</p>
+    <div class="text-gray-500 text-sm grid grid-cols-2 gap-2">
+        <p><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
+        <p><b>Kết thúc:</b> ${data.endDate || "-"}</p>
+        <p class="col-span-2"><b>Ghi chú:</b> ${data.comment || "-"}</p>
+        <p><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
+        <p><b>Ngày tạo:</b> ${createdAt}</p>
+        ${updatedAt !== createdAt ? `<p class="col-span-2"><b>Cập nhật:</b> ${updatedAt}</p>` : ""}
+    </div>
+    <div class="flex space-x-2 mt-4">
+        <button class="view-tasks-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm hover:bg-blue-600 transition duration-300">👁️ Chi tiết</button>
+        ${isOwner || isAdmin ? `<button class="edit-btn bg-yellow-500 text-white px-3 py-1 rounded-md text-sm hover:bg-yellow-600 transition duration-300">✏️ Sửa</button>` : ""}
+        ${isOwner || isAdmin ? `<button class="delete-btn bg-red-500 text-white px-3 py-1 rounded-md text-sm hover:bg-red-600 transition duration-300">🗑️ Xóa</button>` : ""}
+    </div>
   `;
+  
+  renderLogs(id, projectCard, isAdmin);
   projectArea.appendChild(projectCard);
-
-  // render log riêng trên cùng
-  renderLogs(id, projectCard);
-
-  // buttons
-  const btns = document.createElement("div");
-  btns.className = "flex space-x-2 mt-2";
-  btns.innerHTML = `
-    <button data-id="${id}" class="view-tasks-btn bg-blue-500 text-white px-3 py-1 rounded-md text-sm">👁️</button>
-    <button data-id="${id}" class="copy-btn bg-green-500 text-white px-3 py-1 rounded-md text-sm">📋</button>
-    <button data-id="${id}" class="edit-btn bg-yellow-500 text-white px-3 py-1 rounded-md text-sm">✏️</button>
-    <button data-id="${id}" class="delete-btn bg-red-500 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
-  `;
-  projectCard.appendChild(btns);
 }
 
-// ===== Real-time listener =====
+// ===== Real-time listener for projects =====
 function setupProjectListener() {
-  const projectsCol = collection(db, "projects");
+  const projectsCol = collection(db, projectsCollection);
   const q = query(projectsCol, orderBy("createdAt", "desc"));
   onSnapshot(q, (snapshot) => {
     projectArea.innerHTML = "";
+    if (snapshot.empty) {
+        projectArea.innerHTML = `<div class="text-center p-8 text-gray-500">Chưa có dự án nào được tạo.</div>`;
+    }
     snapshot.forEach((doc) => renderProject(doc));
-
-    document.querySelectorAll(".edit-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.currentTarget.dataset.id;
-        const docToEdit = snapshot.docs.find((d) => d.id === id);
-        if (docToEdit) editProject(id, docToEdit.data());
-      });
-    });
-
-    document.querySelectorAll(".delete-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.currentTarget.dataset.id;
-        showDeleteConfirmation(id);
-      });
-    });
-
-    document.querySelectorAll(".copy-btn").forEach((btn) => {
-      btn.addEventListener("click", async (e) => {
-        const id = e.currentTarget.dataset.id;
-        const docToCopy = snapshot.docs.find((d) => d.id === id);
-        if (docToCopy) {
-          await copyProject(id, docToCopy.data());
-        }
-      });
-    });
-
-    document.querySelectorAll(".view-tasks-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.currentTarget.dataset.id;
-        const docToView = snapshot.docs.find((d) => d.id === id);
-        if (docToView) {
-          const projectTitle = docToView.data().title;
-          openedProjectId = id;
-          showTaskBoard(id, projectTitle);
-        }
-      });
-    });
+  }, (error) => {
+    console.error("Error setting up project listener:", error);
+    projectArea.innerHTML = `<div class="text-center p-8 text-red-500">Lỗi khi tải dự án. Vui lòng thử lại.</div>`;
   });
 }
 
+// ===== Event Delegation for Project Actions =====
+projectArea.addEventListener('click', async (e) => {
+    const targetBtn = e.target.closest('.edit-btn, .delete-btn, .view-tasks-btn');
+    if (!targetBtn) return;
+
+    const card = targetBtn.closest('[data-project-id]');
+    const id = card.dataset.projectId;
+
+    if (targetBtn.classList.contains('edit-btn')) {
+        const docRef = doc(db, projectsCollection, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            editProject(id, docSnap.data());
+        }
+    } else if (targetBtn.classList.contains('delete-btn')) {
+        showDeleteConfirmation(id);
+    } else if (targetBtn.classList.contains('view-tasks-btn')) {
+        const docRef = doc(db, projectsCollection, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const projectTitle = docSnap.data().title;
+            openedProjectId = id;
+            // Placeholder for task board logic, assuming tasks.js exists and is handled.
+            showTaskBoard(id, projectTitle);
+        }
+    }
+});
+
 // ===== Add / Update project =====
 saveProjectBtn.addEventListener("click", async () => {
-  const title = projectTitleInput.value.trim();
-  const description = projectDescriptionInput.value.trim();
-  const startDate = projectStartInput.value;
-  const endDate = projectEndInput.value;
-  const comment = projectCommentInput.value.trim();
-  if (!title) return;
-
-  try {
-    const user = auth.currentUser;
-    if (isEditing) {
-      const projectDocRef = doc(db, "projects", currentProjectId);
-      await updateDoc(projectDocRef, { title, description, startDate, endDate, comment, updatedAt: new Date() });
-      await addProjectLog(currentProjectId, "cập nhật dự án", `(${title})`);
-    } else {
-      const newProject = await addDoc(collection(db, "projects"), {
-        title,
-        description,
-        startDate,
-        endDate,
-        comment,
-        createdAt: new Date(),
-        createdBy: user ? user.email : "Ẩn danh"
-      });
-      await addProjectLog(newProject.id, "tạo dự án", `(${title})`);
+    const title = projectTitleInput.value.trim();
+    const description = projectDescriptionInput.value.trim();
+    const startDate = projectStartInput.value;
+    const endDate = projectEndInput.value;
+    const comment = projectCommentInput.value.trim();
+    if (!title) {
+        console.error("Tiêu đề dự án không được để trống!");
+        return;
     }
-    hideModal("projectModal");
-  } catch (e) { console.error("Error add/update:", e); }
+    
+    const user = auth.currentUser;
+    if (!user) {
+        console.error("User not authenticated.");
+        return;
+    }
+
+    try {
+        if (isEditing) {
+            const projectDocRef = doc(db, projectsCollection, currentProjectId);
+            await updateDoc(projectDocRef, {
+                title,
+                description,
+                startDate,
+                endDate,
+                comment,
+                updatedAt: serverTimestamp()
+            });
+            await addProjectLog(currentProjectId, "cập nhật dự án", `(${title})`);
+        } else {
+            const newProject = await addDoc(collection(db, projectsCollection), {
+                title,
+                description,
+                startDate,
+                endDate,
+                comment,
+                createdBy: user.email,
+                createdAt: serverTimestamp()
+            });
+            await addProjectLog(newProject.id, "tạo dự án", `(${title})`);
+        }
+        hideModal("projectModal");
+    } catch (e) {
+        console.error("Error add/update:", e);
+    }
 });
 
 // ===== Edit project =====
 function editProject(id, data) {
-  isEditing = true;
-  currentProjectId = id;
-  projectModalTitle.textContent = "Cập nhật dự án";
-  projectTitleInput.value = data.title || "";
-  projectDescriptionInput.value = data.description || "";
-  projectStartInput.value = data.startDate || "";
-  projectEndInput.value = data.endDate || "";
-  projectCommentInput.value = data.comment || "";
-  showModal("projectModal");
+    isEditing = true;
+    currentProjectId = id;
+    projectModalTitle.textContent = "Cập nhật dự án";
+    projectTitleInput.value = data.title || "";
+    projectDescriptionInput.value = data.description || "";
+    projectStartInput.value = data.startDate || "";
+    projectEndInput.value = data.endDate || "";
+    projectCommentInput.value = data.comment || "";
+    showModal("projectModal");
 }
 
 // ===== Copy project =====
 async function copyProject(id, data) {
-  const user = auth.currentUser;
-  const newTitle = `${data.title} (Copy)`;
+    const user = auth.currentUser;
+    const newTitle = `${data.title} (Copy)`;
+    if (!user) {
+        console.error("User not authenticated.");
+        return;
+    }
 
-  try {
-    const { createdAt, updatedAt, createdBy, ...rest } = data;
-    const newProjectRef = await addDoc(collection(db, "projects"), {
-      ...rest,
-      title: newTitle,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: user ? user.email : "Ẩn danh"
-    });
+    try {
+        const { createdAt, updatedAt, createdBy, ...rest } = data;
+        const newProjectRef = await addDoc(collection(db, projectsCollection), {
+            ...rest,
+            title: newTitle,
+            createdAt: serverTimestamp(),
+            createdBy: user.email
+        });
 
-    await addProjectLog(newProjectRef.id, "sao chép dự án", `từ (${data.title}) sang (${newTitle})`);
-  } catch (e) {
-    console.error("Lỗi khi sao chép dự án:", e);
-  }
+        await addProjectLog(newProjectRef.id, "sao chép dự án", `từ (${data.title}) sang (${newTitle})`);
+    } catch (e) {
+        console.error("Lỗi khi sao chép dự án:", e);
+    }
 }
 
 // ===== Delete project =====
 function showDeleteConfirmation(id) {
-  currentProjectId = id;
-  showModal("deleteModal");
+    currentProjectId = id;
+    showModal("deleteModal");
 }
+
 confirmDeleteBtn.addEventListener("click", async () => {
-  try {
-    await deleteDoc(doc(db, "projects", currentProjectId));
-    await addProjectLog(currentProjectId, "xóa dự án");
-    if (openedProjectId === currentProjectId) {
-      const taskBoard = document.getElementById("taskBoard");
-      if (taskBoard) taskBoard.innerHTML = "";
-      openedProjectId = null;
+    try {
+        const docRef = doc(db, projectsCollection, currentProjectId);
+        const docSnap = await getDoc(docRef);
+        const projectData = docSnap.data();
+
+        const user = auth.currentUser;
+        const isAdmin = user && user.email === "admin@gmail.com";
+        const isOwner = user && projectData.createdBy === user.email;
+
+        if (!isAdmin && !isOwner) {
+            console.error("Permission denied. User is not the owner or an admin.");
+            hideModal("deleteModal");
+            return;
+        }
+
+        await deleteDoc(doc(db, projectsCollection, currentProjectId));
+        await addProjectLog(currentProjectId, "xóa dự án");
+        
+        // Also delete all associated logs
+        const logsToDelete = await getDocs(query(collection(db, logsCollection), where("projectId", "==", currentProjectId)));
+        logsToDelete.forEach(async (logDoc) => {
+            await deleteDoc(doc(db, logsCollection, logDoc.id));
+        });
+        
+        // Close task board if the deleted project was open
+        if (openedProjectId === currentProjectId) {
+            // Placeholder for task board logic
+            const taskBoard = document.getElementById("taskBoard");
+            if (taskBoard) taskBoard.innerHTML = "";
+            openedProjectId = null;
+        }
+
+        hideModal("deleteModal");
+    } catch (e) {
+        console.error("Error deleting project:", e);
     }
-    hideModal("deleteModal");
-  } catch (e) { console.error("Error deleting project:", e); }
 });
+
 cancelDeleteBtn.addEventListener("click", () => hideModal("deleteModal"));
 cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
 
 // ===== Add project modal =====
 addProjectBtn.addEventListener("click", () => {
   isEditing = false;
+  currentProjectId = null;
   projectModalTitle.textContent = "Tạo dự án mới";
   projectTitleInput.value = "";
   projectDescriptionInput.value = "";
@@ -324,3 +390,15 @@ auth.onAuthStateChanged((user) => {
     addProjectBtn.classList.add("hidden");
   }
 });
+
+const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+if (initialAuthToken) {
+    signInWithCustomToken(auth, initialAuthToken).catch((error) => {
+        console.error("Error signing in with custom token:", error);
+        signInAnonymously(auth);
+    });
+} else {
+    signInAnonymously(auth).catch((error) => {
+        console.error("Error signing in anonymously:", error);
+    });
+}
