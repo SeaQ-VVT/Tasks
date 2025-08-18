@@ -141,7 +141,7 @@ function renderLog(docSnap) {
   const logDiv = document.createElement("div");
   logDiv.className = "p-2 mb-1 rounded-md text-sm";
   let color = "bg-gray-100";
-  let icon = "�";
+  let icon = "📝";
 
   if (logData.action === "thêm") {
     color = "bg-green-100";
@@ -572,4 +572,3 @@ toggleLogBtn.addEventListener("click", () => {
 });
 
 clearLogsBtn.addEventListener("click", deleteAllLogs);
-�
