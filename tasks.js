@@ -287,19 +287,22 @@ export function showTaskBoard(projectId, projectTitle) {
       <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
     </div>
 
+    <!-- Cấu trúc mới sử dụng CSS Grid -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
+      <!-- Cột To Do -->
       <div class="bg-white p-3 rounded shadow min-h-[400px]" id="todoArea">
         <h3 class="font-bold text-red-600 mb-2">To Do</h3>
         <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">+ Group</button>
         <div id="groupContainer" class="space-y-3 mt-2"></div>
       </div>
-      <div class="bg-white p-3 rounded shadow min-h-[400px]" id="inprogressArea">
+      <!-- Các cột In Progress và Done sẽ được tạo động -->
+      <div class="bg-white p-3 rounded shadow min-h-[400px]">
         <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
-        <div id="inprogressCol" class="space-y-3 mt-2 min-h-[200px]"></div>
+        <div id="inprogressCol" class="grid grid-cols-1 gap-3 mt-2"></div>
       </div>
-      <div class="bg-white p-3 rounded shadow min-h-[400px]" id="doneArea">
+      <div class="bg-white p-3 rounded shadow min-h-[400px]">
         <h3 class="font-bold text-green-600 mb-2">Done</h3>
-        <div id="doneCol" class="space-y-3 mt-2 min-h-[200px]"></div>
+        <div id="doneCol" class="grid grid-cols-1 gap-3 mt-2"></div>
       </div>
     </div>
 
@@ -483,6 +486,16 @@ function loadGroups(projectId) {
     groupContainer.innerHTML = "";
     inprogressCol.innerHTML = "";
     doneCol.innerHTML = "";
+    
+    // Tạo cấu trúc grid cho cột In Progress và Done
+    // Mỗi group sẽ là một hàng trong grid
+    const inprogressGroupGrid = document.createElement("div");
+    inprogressGroupGrid.className = "grid grid-cols-1 gap-3";
+    inprogressCol.appendChild(inprogressGroupGrid);
+
+    const doneGroupGrid = document.createElement("div");
+    doneGroupGrid.className = "grid grid-cols-1 gap-3";
+    doneCol.appendChild(doneGroupGrid);
 
     snapshot.forEach((docSnap) => {
       const gid = docSnap.id;
@@ -490,25 +503,25 @@ function loadGroups(projectId) {
 
       // Hiển thị phần "In Progress"
       const ipSection = document.createElement("div");
-      ipSection.className = "border rounded p-2 bg-gray-50 shadow";
+      ipSection.className = "border rounded p-2 bg-gray-50 shadow min-h-[50px] flex flex-col";
       ipSection.innerHTML = `
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center mb-1">
           <span class="font-semibold text-yellow-700">${g.title}</span>
         </div>
-        <div id="inprogress-${gid}" class="space-y-1 mt-2 min-h-[30px]"></div>
+        <div id="inprogress-${gid}" class="space-y-1 mt-2 flex-grow"></div>
       `;
-      inprogressCol.appendChild(ipSection);
+      inprogressGroupGrid.appendChild(ipSection);
 
       // Hiển thị phần "Done"
       const doneSection = document.createElement("div");
-      doneSection.className = "border rounded p-2 bg-gray-50 shadow";
+      doneSection.className = "border rounded p-2 bg-gray-50 shadow min-h-[50px] flex flex-col";
       doneSection.innerHTML = `
-        <div class="flex justify-between items-center">
+        <div class="flex justify-between items-center mb-1">
           <span class="font-semibold text-green-700">${g.title}</span>
         </div>
-        <div id="done-${gid}" class="space-y-1 mt-2 min-h-[30px]"></div>
+        <div id="done-${gid}" class="space-y-1 mt-2 flex-grow"></div>
       `;
-      doneCol.appendChild(doneSection);
+      doneGroupGrid.appendChild(doneSection);
 
       // Hiển thị thẻ Group ở cột To Do
       renderGroup(docSnap);
@@ -525,7 +538,7 @@ function renderGroup(docSnap) {
   const gid = docSnap.id;
 
   const div = document.createElement("div");
-  div.className = "border rounded p-2 bg-gray-50 shadow";
+  div.className = "border rounded p-2 bg-gray-50 shadow min-h-[50px]";
   div.id = `group-${gid}`;
 
   const deadlineText = g.deadline ? `<span class="text-xs text-gray-500 ml-2">⏰ ${formatDateVN(g.deadline)}</span>` : "";
@@ -800,7 +813,14 @@ async function editGroup(groupId, g) {
 
 async function deleteGroup(groupId, g) {
   if (!isAuthReady) return;
-  if (!confirm("Bạn có chắc muốn xóa group này?")) return;
+  // Sử dụng modal thay vì confirm
+  const userConfirmed = await new Promise(resolve => {
+    openModal("Xác nhận xóa", [
+      { id: "confirm-text", placeholder: "Bạn có chắc muốn xóa group này?", type: "text", disabled: true }
+    ], () => resolve(true));
+    document.getElementById("modalCancel").onclick = () => resolve(false);
+  });
+  if (!userConfirmed) return;
 
   const taskSnap = await getDocs(query(collection(db, "tasks"), where("groupId", "==", groupId)));
   const tasksToDelete = taskSnap.docs.map(t => t.id);
@@ -850,33 +870,48 @@ function setupDragDrop() {
 
       const taskId = e.dataTransfer.getData("taskId");
       if (!taskId) return;
-
-      const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
-
+      
+      // Tìm group của task để xác định group container
       const taskRef = doc(db, "tasks", taskId);
       const taskSnap = await getDoc(taskRef);
       if (!taskSnap.exists()) return;
       const taskData = taskSnap.data();
 
-      // Cập nhật trạng thái và tiến độ
-      const updatePayload = {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        updatedBy: currentUser?.email || "Ẩn danh"
-      };
-
-      if (newStatus === "done") {
-        updatePayload.progress = 100;
+      // Kiểm tra xem drop có đúng vào container của group đó không
+      let targetElement = e.target;
+      while (targetElement && !targetElement.id.startsWith("inprogress-") && !targetElement.id.startsWith("done-")) {
+        targetElement = targetElement.parentElement;
       }
-
-      await updateDoc(taskRef, updatePayload);
-
-      // Ghi log hoạt động
-      let logMessage = `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`;
-      if (newStatus === "done") {
-        logMessage += ` và hoàn thành 100%`;
+      
+      const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+      
+      // Nếu thả vào cột đúng, cập nhật trạng thái
+      if (targetElement) {
+         if (
+           (targetElement.id === `inprogress-${taskData.groupId}` && newStatus === "inprogress") ||
+           (targetElement.id === `done-${taskData.groupId}` && newStatus === "done")
+         ) {
+           // Cập nhật trạng thái và tiến độ
+           const updatePayload = {
+             status: newStatus,
+             updatedAt: serverTimestamp(),
+             updatedBy: currentUser?.email || "Ẩn danh"
+           };
+     
+           if (newStatus === "done") {
+             updatePayload.progress = 100;
+           }
+     
+           await updateDoc(taskRef, updatePayload);
+     
+           // Ghi log hoạt động
+           let logMessage = `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`;
+           if (newStatus === "done") {
+             logMessage += ` và hoàn thành 100%`;
+           }
+           await logAction(taskData.projectId, logMessage);
+         }
       }
-      await logAction(taskData.projectId, logMessage);
     });
   });
 }
@@ -888,4 +923,3 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
-
