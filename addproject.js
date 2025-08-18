@@ -80,7 +80,7 @@ function displayName(email) {
 // ===== LOGGING =====
 async function addProjectLog(projectId, action, detail) {
   const user = auth.currentUser;
-  await addDoc(collection(db, "logs"), {
+  await addDoc(collection(db, "project_logs"), {
     projectId,
     action,
     detail,
@@ -89,45 +89,33 @@ async function addProjectLog(projectId, action, detail) {
   });
 }
 
-async function toggleLogs(projectId) {
-  const logDiv = document.getElementById(`logs-${projectId}`);
+async function loadProjectLogs() {
+  const logDiv = document.getElementById("projectLogsArea");
   if (!logDiv) return;
+  logDiv.innerHTML = "";
 
-  if (!logDiv.classList.contains("hidden")) {
-    logDiv.classList.add("hidden");
-    logDiv.innerHTML = "";
-    return;
-  }
-
-  const q = query(
-    collection(db, "logs"),
-    where("projectId", "==", projectId),
-    orderBy("createdAt", "desc")
-  );
+  const q = query(collection(db, "project_logs"), orderBy("createdAt", "desc"));
   const snap = await getDocs(q);
 
   let html = "<ul class='text-sm text-gray-700'>";
   snap.forEach((docu) => {
     const d = docu.data();
     const time = d.createdAt?.toDate().toLocaleString() || "-";
-    html += `<li class="mb-1">
-      <b>${d.user}</b> [${d.action}] lúc ${time}: ${d.detail}
+    html += `<li class="mb-1 border-b pb-1">
+      <b>${d.user}</b> đã <i>${d.action}</i> lúc ${time}: ${d.detail}
       ${auth.currentUser?.email === "admin@gmail.com" ? 
-        `<button data-logid="${docu.id}" class="delete-log-btn text-red-500 ml-2">X</button>` : ""}
+        `<button data-logid="${docu.id}" class="delete-project-log text-red-500 ml-2">❌</button>` : ""}
     </li>`;
   });
   html += "</ul>";
-
   logDiv.innerHTML = html;
-  logDiv.classList.remove("hidden");
 
-  logDiv.querySelectorAll(".delete-log-btn").forEach(btn => {
+  // bind delete log
+  logDiv.querySelectorAll(".delete-project-log").forEach(btn => {
     btn.addEventListener("click", async (e) => {
       const logId = e.currentTarget.dataset.logid;
-      if (auth.currentUser?.email === "admin@gmail.com") {
-        await deleteDoc(doc(db, "logs", logId));
-        toggleLogs(projectId);
-      }
+      await deleteDoc(doc(db, "project_logs", logId));
+      loadProjectLogs();
     });
   });
 }
@@ -155,9 +143,7 @@ function renderProject(docSnap) {
       <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
       <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
       <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
-      <button data-id="${id}" class="show-logs-btn bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded-md text-sm">📜</button>
     </div>
-    <div id="logs-${id}" class="hidden bg-gray-50 border rounded p-2 mt-2"></div>
   `;
   projectArea.appendChild(projectCard);
 }
@@ -199,13 +185,6 @@ function setupProjectListener() {
           openedProjectId = id;
           showTaskBoard(id, projectTitle);
         }
-      });
-    });
-
-    document.querySelectorAll(".show-logs-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const id = e.currentTarget.dataset.id;
-        toggleLogs(id);
       });
     });
   });
@@ -314,6 +293,20 @@ addProjectBtn.addEventListener("click", () => {
   projectCommentInput.value = "";
   showModal("projectModal");
 });
+
+// ===== Toggle logs =====
+const toggleBtn = document.getElementById("toggleLogsBtn");
+if (toggleBtn) {
+  toggleBtn.addEventListener("click", () => {
+    const logDiv = document.getElementById("projectLogsArea");
+    if (logDiv.classList.contains("hidden")) {
+      loadProjectLogs();
+      logDiv.classList.remove("hidden");
+    } else {
+      logDiv.classList.add("hidden");
+    }
+  });
+}
 
 // ===== Auth listener =====
 auth.onAuthStateChanged((user) => {
