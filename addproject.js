@@ -31,7 +31,6 @@ const firebaseConfig = {
   messagingSenderId: "1080268498085",
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
-
 // ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -39,6 +38,7 @@ const db = getFirestore(app);
 
 // ===== DOM elements =====
 const projectArea = document.getElementById("projectArea");
+projectArea.className = "flex flex-wrap gap-4 justify-start";
 const addProjectBtn = document.getElementById("addProjectBtn");
 const projectModal = document.getElementById("projectModal");
 const projectModalTitle = document.getElementById("projectModalTitle");
@@ -89,7 +89,6 @@ function ensureCopyModal() {
 // ===== State =====
 let isEditing = false;
 let currentProjectId = null;
-// >>> NEW: nhớ dự án đang mở để không bị nhảy sang dự án khác khi realtime update
 let openedProjectId = null;
 
 // ===== Utility =====
@@ -111,6 +110,46 @@ function displayName(email) {
   return String(email).split("@")[0];
 }
 
+// ===== Scroll to project title =====
+function scrollToProjectTitle() {
+  const projectTitle = document.querySelector("#taskBoard h2");
+  if (projectTitle) {
+    projectTitle.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// ===== Calculate countdown and update color =====
+function updateCountdownAndColor(projectCard, endDate) {
+  if (!endDate) {
+    projectCard.querySelector(".countdown")?.remove();
+    return;
+  }
+
+  const now = new Date();
+  const end = new Date(endDate);
+  const diffMs = end - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  let countdownElement = projectCard.querySelector(".countdown");
+  if (!countdownElement) {
+    countdownElement = document.createElement("p");
+    //countdownElement.className = "text-gray-800 text-3xl countdown";
+    // Thêm các lớp để tạo nền màu xanh và chữ trắng
+    countdownElement.className = "bg-blue-500 text-white px-3 py-1 rounded-full text-lg countdown";
+    projectCard.insertBefore(countdownElement, projectCard.querySelector("div.flex"));
+  }
+
+  if (diffMs <= 0) {
+    countdownElement.textContent = "Đã đến hạn";
+    projectCard.classList.add("bg-green-500");
+    projectCard.classList.remove("bg-white");
+  } else {
+    countdownElement.textContent = `Còn ${diffDays} ngày`;
+    projectCard.classList.remove("bg-green-500");
+    projectCard.classList.add("bg-white");
+  }
+}
+
 // ===== Render project card =====
 function renderProject(docSnap) {
   const data = docSnap.data();
@@ -118,8 +157,8 @@ function renderProject(docSnap) {
 
   const projectCard = document.createElement("div");
   projectCard.className =
-    "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-105 mb-4";
-
+   "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-110 mb-4";
+  
   const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
 
   projectCard.innerHTML = `
@@ -132,12 +171,18 @@ function renderProject(docSnap) {
     <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
     <div class="flex space-x-2 mt-2">
       <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
-      <button data-id="${id}" class="copy-btn bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
+      <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
       <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
       <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
     </div>
   `;
   projectArea.appendChild(projectCard);
+
+  // Cập nhật thời gian đếm ngược và màu sắc
+  updateCountdownAndColor(projectCard, data.endDate);
+
+  // Cập nhật realtime cho đếm ngược
+  setInterval(() => updateCountdownAndColor(projectCard, data.endDate), 60000); // Cập nhật mỗi phút
 }
 
 // ===== Real-time listener =====
@@ -146,13 +191,11 @@ function setupProjectListener() {
   const q = query(projectsCol, orderBy("createdAt", "desc"));
 
   onSnapshot(q, (snapshot) => {
-    // Chỉ render lại danh sách thẻ dự án, KHÔNG đụng taskBoard
     projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
       renderProject(doc);
     });
 
-    // Events
     document.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const id = e.currentTarget.dataset.id;
@@ -186,9 +229,10 @@ function setupProjectListener() {
         const docToView = snapshot.docs.find((d) => d.id === id);
         if (docToView) {
           const projectTitle = docToView.data().title;
-          openedProjectId = id; // nhớ dự án đang mở
+          openedProjectId = id;
           console.log("Viewing tasks for project:", id);
           showTaskBoard(id, projectTitle);
+          setTimeout(scrollToProjectTitle, 100);
         }
       });
     });
@@ -239,8 +283,6 @@ saveProjectBtn.addEventListener("click", async () => {
     projectStartInput.value = "";
     projectEndInput.value = "";
     projectCommentInput.value = "";
-    // giữ nguyên isEditing theo flow hiện tại
-
   } catch (e) {
     console.error("Error adding/updating project: ", e);
   }
@@ -269,11 +311,8 @@ function copyProject(id, data) {
   showModal("copyModal");
 }
 
-// Helper: (tuỳ chọn) copy subcollections của task nếu bạn có dùng
 async function copyTaskSubcollections(oldTaskId, newTaskId) {
-  // Nếu không dùng subcollection cho task, bạn có thể bỏ qua function này.
-  // Ví dụ các subcollection phổ biến: ["subtasks", "comments", "files"]
-  const subs = []; // để trống để không ảnh hưởng logic hiện tại
+  const subs = [];
   for (const sub of subs) {
     const q = query(collection(db, `tasks/${oldTaskId}/${sub}`));
     const snap = await getDocs(q);
@@ -310,7 +349,6 @@ if (confirmCopyBtn) {
       if (!srcDoc.exists()) throw new Error("Dự án gốc không tồn tại.");
       const src = srcDoc.data() || {};
 
-      // 1) Tạo project mới (làm sạch metadata cũ)
       const { createdAt, updatedAt, createdBy, ...rest } = src;
       const newProjectRef = await addDoc(collection(db, "projects"), {
         ...rest,
@@ -321,7 +359,6 @@ if (confirmCopyBtn) {
       });
       const newProjectId = newProjectRef.id;
 
-      // 2) Copy GROUPS trước, tạo map oldGroupId -> newGroupId
       const groupsQ = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
       const groupsSnap = await getDocs(groupsQ);
 
@@ -340,7 +377,6 @@ if (confirmCopyBtn) {
         })
       );
 
-      // 3) Copy TASKS (remap projectId & groupId nếu có)
       const tasksQ = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
       const tasksSnap = await getDocs(tasksQ);
 
@@ -363,7 +399,6 @@ if (confirmCopyBtn) {
 
       hideModal("copyModal");
       console.log("Đã sao chép dự án và toàn bộ dữ liệu liên quan thành công!");
-
     } catch (e) {
       console.error("Lỗi khi sao chép dự án:", e);
     } finally {
@@ -384,30 +419,26 @@ function showDeleteConfirmation(id) {
 
 confirmDeleteBtn.addEventListener("click", async () => {
   try {
-    // Find and delete all tasks associated with the project
     const tasksQuery = query(collection(db, "tasks"), where("projectId", "==", currentProjectId));
     const tasksSnapshot = await getDocs(tasksQuery);
     const tasksToDelete = tasksSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(tasksToDelete);
 
-    // Find and delete all groups associated with the project
     const groupsQuery = query(collection(db, "groups"), where("projectId", "==", currentProjectId));
     const groupsSnapshot = await getDocs(groupsQuery);
     const groupsToDelete = groupsSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(groupsToDelete);
 
-    // Find and delete all logs associated with the project
     const logsQuery = query(collection(db, "logs"), where("projectId", "==", currentProjectId));
     const logsSnapshot = await getDocs(logsQuery);
     const logsToDelete = logsSnapshot.docs.map((docu) => deleteDoc(docu.ref));
     await Promise.all(logsToDelete);
-    // ✅ Delete all progress_history
+
     const progressQuery = query(collection(db, "progress_history"), where("projectId", "==", currentProjectId));
     const progressSnapshot = await getDocs(progressQuery);
     await Promise.all(progressSnapshot.docs.map((docu) => deleteDoc(docu.ref)));
-    // Finally, delete the project document itself
+
     await deleteDoc(doc(db, "projects", currentProjectId));
-    // 🔻 THÊM 4 DÒNG NÀY Ở ĐÂY
     if (openedProjectId === currentProjectId) {
       const taskBoard = document.getElementById("taskBoard");
       if (taskBoard) taskBoard.innerHTML = "";
@@ -439,10 +470,77 @@ auth.onAuthStateChanged((user) => {
   if (user) {
     addProjectBtn.classList.remove("hidden");
     setupProjectListener();
+    setupSidebar();
   } else {
     projectArea.innerHTML = "";
     addProjectBtn.classList.add("hidden");
+    const sidebar = document.getElementById("projectSidebar");
+    if (sidebar) sidebar.remove();
+    const homeIcon = document.getElementById("homeIcon");
+    if (homeIcon) homeIcon.remove();
   }
 });
+
+// ===== Thêm thanh công cụ bên trái (Sidebar) =====
+function setupSidebar() {
+  let homeIcon = document.getElementById("homeIcon");
+  if (!homeIcon) {
+    homeIcon = document.createElement("button");
+    homeIcon.id = "homeIcon";
+    homeIcon.innerHTML = "🏠";
+    homeIcon.className = "fixed top-10 left-4 z-50 text-3xl bg-white rounded-full p-2 shadow-lg hover:bg-gray-100 transition";
+    document.body.appendChild(homeIcon);
+  }
+
+  let sidebar = document.getElementById("projectSidebar");
+  if (!sidebar) {
+    sidebar = document.createElement("div");
+    sidebar.id = "projectSidebar";
+    sidebar.className =
+      "fixed top-0 left-0 h-full w-[2cm] bg-gradient-to-b from-green-900 to-black text-white shadow-lg z-40 overflow-y-auto p-4 pt-[3cm] hidden";
+    sidebar.innerHTML = `
+      <h3 class="text-lg font-bold mb-4 text-green-200"></h3>
+      <div id="username" class="text-sm mb-2"></div>
+      <div id="username" class="text-sm mb-2"></div>
+      <div id="username" class="text-sm mb-2"></div>
+      <div id="username" class="text-sm mb-2"></div>
+      <ul id="sidebarProjectList" class="space-y-2"></ul>
+    `;
+    document.body.appendChild(sidebar);
+  }
+
+  homeIcon.addEventListener("click", () => {
+    sidebar.classList.toggle("hidden");
+  });
+
+
+
+  const projectsCol = collection(db, "projects");
+  const q = query(projectsCol, orderBy("createdAt", "desc"));
+
+  onSnapshot(q, (snapshot) => {
+    const sidebarList = document.getElementById("sidebarProjectList");
+    sidebarList.innerHTML = "";
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      const id = doc.id;
+      const listItem = document.createElement("li");
+      listItem.className = "cursor-pointer text-green-200 hover:text-green-100 transition";
+      listItem.textContent = data.title;
+      listItem.addEventListener("click", () => {
+        openedProjectId = id;
+        showTaskBoard(id, data.title);
+        sidebar.classList.add("hidden");
+        setTimeout(scrollToProjectTitle, 100);
+      });
+      sidebarList.appendChild(listItem);
+    });
+  });
+}
+
+
+
+
+
 
 

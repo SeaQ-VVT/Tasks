@@ -159,15 +159,14 @@
     } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
     import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-      authDomain: "task-manager-d18aa.firebaseapp.com",
-      projectId: "task-manager-d18aa",
-      storageBucket: "task-manager-d18aa.appspot.com",
-      messagingSenderId: "1080268498085",
-      appId: "1:1080268498085:web:767434c6a2c013b961d94c"
-    };
-
+const firebaseConfig = {
+  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+  authDomain: "task-manager-d18aa.firebaseapp.com",
+  projectId: "task-manager-d18aa",
+  storageBucket: "task-manager-d18aa.appspot.com",
+  messagingSenderId: "1080268498085",
+  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
+};
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -381,5 +380,6 @@
   <script type="module" src="tasks.js"></script>
 </body>
 </html>
+
 
 

@@ -85,7 +85,11 @@ function openModal(title, fields, onSave) {
           <input id="${f.id}" type="range" min="0" max="100" value="${f.value || 0}" class="w-full">
         </div>`;
     } else if (f.type === "date") {
-      fieldsDiv.innerHTML += `<input id="${f.id}" type="date" class="border p-2 w-full rounded-md" value="${f.value || ""}">`;
+      fieldsDiv.innerHTML += `
+        <div class="flex flex-col">
+          <label for="${f.id}" class="text-gray-700">${f.label || 'Hạn Chót'}:</label>
+          <input id="${f.id}" type="date" class="border p-2 w-full rounded-md" value="${f.value || ""}">
+        </div>`;
     } else {
       fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full rounded-md" value="${f.value || ""}">`;
     }
@@ -222,7 +226,7 @@ function listenForLogs(projectId) {
 // ===== Cấu hình và Helpers cho Deadline =====
 const DEADLINE_CFG = {
   thresholds: [14, 7, 3], // <=14 cam, <=7 vàng, <=3 đỏ
-  classes: ["ring-2 ring-orange-300", "ring-2 ring-yellow-400", "ring-2 ring-red-500"],
+  classes: ["bg-orange-100", "bg-yellow-300", "bg-red-400"],
 };
 
 function daysUntil(dateStr) {
@@ -252,7 +256,7 @@ function getGroupWarnClass(g) {
 function removeWarnClasses(el) {
   if (!el) return;
   [...el.classList].forEach(c => {
-    if (c.startsWith("ring-")) el.classList.remove(c);
+    if (c.startsWith("bg-")) el.classList.remove(c);
   });
 }
 
@@ -299,34 +303,26 @@ export function showTaskBoard(projectId, projectTitle) {
       <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
     </div>
 
-    <!-- Cập nhật lớp Tailwind cho các cột để có cùng chiều cao và thanh cuộn -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
-      <!-- Cột To Do -->
-      <div class="bg-white p-3 rounded shadow flex flex-col">
+      <div class="bg-white p-3 rounded-2xl shadow flex flex-col border-4 border-teal-200">
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-bold text-red-600">To Do</h3>
           <button id="addGroupBtn" class="bg-blue-500 text-white px-2 py-1 rounded text-xs hover:bg-blue-600 transition-colors">
             + Group
           </button>
         </div>
-        <!-- Thêm chiều cao cố định và thanh cuộn cho group container -->
-        <div id="groupContainer" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
+        <div id="groupContainer" class="space-y-3 mt-2 h-[20cm] overflow-y-auto"></div>
       </div>
-      <!-- Cột In Progress -->
-      <div class="bg-white p-3 rounded shadow flex flex-col">
+      <div class="bg-white p-3 rounded-2xl shadow flex flex-col border-4 border-blue-200">
         <h3 class="font-bold text-yellow-600 mb-2">In Progress</h3>
-        <!-- Thêm chiều cao cố định và thanh cuộn cho cột In Progress -->
-        <div id="inprogressCol" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
+        <div id="inprogressCol" class="space-y-3 mt-2 h-[20cm] overflow-y-auto"></div>
       </div>
-      <!-- Cột Done -->
-      <div class="bg-white p-3 rounded shadow flex flex-col">
+      <div class="bg-white p-3 rounded-2xl shadow flex flex-col border-4 border-green-400">
         <h3 class="font-bold text-green-600 mb-2">Done</h3>
-        <!-- Thêm chiều cao cố định và thanh cuộn cho cột Done -->
-        <div id="doneCol" class="space-y-3 mt-2 h-[30cm] overflow-y-auto"></div>
+        <div id="doneCol" class="space-y-3 mt-2 h-[20cm] overflow-y-auto"></div>
       </div>
     </div>
 
-    <!-- Biểu đồ tổng tiến độ dự án -->
     <div id="project-progress-chart-container" class="mt-8 bg-white p-4 rounded shadow">
         <h3 class="font-bold text-gray-800 mb-2">Tiến độ tổng thể dự án</h3>
         <canvas id="project-progress-chart" class="w-full h-64"></canvas>
@@ -564,7 +560,6 @@ function renderGroup(docSnap) {
     <button class="add-task text-green-600 text-xs mt-1 hover:text-green-700">+ Task</button>
     <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
     
-    <!-- Biểu đồ tiến độ nhóm (Luôn hiển thị) -->
     <div class="progress-bar-container mt-4" id="group-progress-container-${gid}">
       <div class="flex items-center mb-1">
         <span class="text-sm font-semibold text-gray-700 mr-2">Tiến độ nhóm:</span>
@@ -670,13 +665,19 @@ function renderTask(docSnap) {
 
     row.innerHTML = `
       <div class="flex justify-between items-center w-full">
-        <span class="truncate font-medium">${t.title}</span>
+        <div class="flex items-center">
+            <span class="truncate font-medium">${t.title}</span>
+            <span id="task-emoji-${tid}" class="ml-1">${t.emoji || ''}</span>
+        </div>
         <div class="space-x-1 flex-shrink-0">
+          <button class="emoji-picker-btn text-gray-400 hover:text-yellow-600" title="Chọn cảm xúc">🙂</button>
           <button class="edit-task text-yellow-600 hover:text-yellow-700" title="Sửa">✏️</button>
           <button class="comment-task text-gray-400 hover:text-blue-600" title="Comment">💬</button>
           <button class="delete-task text-red-600 hover:text-red-700" title="Xóa">🗑️</button>
         </div>
       </div>
+      <div id="task-info-${tid}" class="flex items-center text-xs text-gray-500 mt-1">
+          </div>
       <div id="progress-container-${tid}" class="mt-1 w-full bg-gray-200 rounded-full h-2">
         <div class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: ${t.progress || 0}%;"></div>
       </div>`;
@@ -688,30 +689,94 @@ function renderTask(docSnap) {
       e.dataTransfer.setData("type", "task");
       e.dataTransfer.setData("taskId", tid);
     });
+    
+    // Sự kiện chọn emoji
+    row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
+      e.stopPropagation(); // Ngăn sự kiện drag
+      const emojiList = ["👍", "🎉", "🔥", "🤔", "👀", "🚀", "❤️", "💯", "✅", "⚠️", "❌"];
+      const picker = document.createElement('div');
+      picker.className = 'absolute z-10 bg-white shadow-lg rounded p-2 flex flex-wrap gap-1';
+      
+      // Lấy vị trí của nút emoji-picker-btn để đặt pop-up
+      const rect = e.target.getBoundingClientRect();
+      picker.style.top = `${rect.bottom + window.scrollY + 5}px`;
+      picker.style.left = `${rect.left + window.scrollX}px`;
+      
+      emojiList.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.textContent = emoji;
+        btn.className = 'hover:bg-gray-200 p-1 rounded';
+btn.onclick = async () => {
+  await updateDoc(doc(db, "tasks", tid), { emoji: emoji });
+  picker.remove();
+
+  const userDisplayName = getUserDisplayName(currentUser?.email || "Ẩn danh");
+
+  // Lấy thông tin group
+  const groupSnap = await getDoc(doc(db, "groups", t.groupId));
+  const groupData = groupSnap.exists() ? groupSnap.data() : { title: "Không rõ" };
+
+  // 🔹 Thông báo nhanh
+ // showToast(`${userDisplayName} thêm ${emoji} vào "${t.title}" (Group: ${groupData.title})`);
+
+  // 🔹 Ghi vào log (giống style cũ)
+  await logAction(t.projectId, `thêm cảm xúc ${emoji} vào task "${t.title}"`, t.groupId);
+};
+
+        picker.appendChild(btn);
+      });
+      document.body.appendChild(picker);
+      
+      const outsideClick = (event) => {
+        if (!picker.contains(event.target) && event.target !== row.querySelector(".emoji-picker-btn")) {
+          picker.remove();
+          document.removeEventListener('click', outsideClick);
+        }
+      };
+      document.addEventListener('click', outsideClick);
+    });
 
     // Sự kiện click nút sửa
     row.querySelector(".edit-task").addEventListener("click", () => {
       openModal("Sửa Task", [
         { id: "title", placeholder: "Task title", type: "text", value: t.title },
         { id: "progress", label: "Tiến độ", type: "range", value: t.progress || 0 },
+        { id: "deadline", label: "Hạn chót", type: "date", value: t.deadline || "" }, // Thêm trường deadline
         { id: "color", label: "Màu", type: "color", value: t.color || "#e5e7eb" }
       ], async (vals) => {
         const oldTitle = t.title;
         const oldProgress = t.progress;
+        const oldDeadline = t.deadline || null;
+        const newDeadline = (vals.deadline && vals.deadline.trim()) ? vals.deadline.trim() : null;
 
-        await updateDoc(doc(db, "tasks", tid), {
-          title: vals.title,
-          color: vals.color,
-          progress: parseInt(vals.progress),
-          updatedAt: serverTimestamp(),
-          updatedBy: currentUser?.email || "Ẩn danh"
-        });
+        const updatePayload = {
+            title: vals.title,
+            color: vals.color,
+            progress: parseInt(vals.progress),
+            updatedAt: serverTimestamp(),
+            updatedBy: currentUser?.email || "Ẩn danh",
+        };
+        // Cập nhật deadline nếu có
+        if (newDeadline) {
+            updatePayload.deadline = newDeadline;
+        } else {
+            updatePayload.deadline = deleteField();
+        }
+
+        await updateDoc(doc(db, "tasks", tid), updatePayload);
 
         if (oldTitle !== vals.title) {
           await logAction(t.projectId, `cập nhật task "${oldTitle}" thành "${vals.title}"`, t.groupId);
         }
         if (oldProgress !== parseInt(vals.progress)) {
           await logAction(t.projectId, `cập nhật tiến độ task "${vals.title}" từ ${oldProgress || 0}% lên ${parseInt(vals.progress)}%`, t.groupId);
+        }
+        if (!oldDeadline && newDeadline) {
+            await logAction(t.projectId, `đặt deadline cho task "${vals.title}" là ${formatDateVN(newDeadline)}`, t.groupId);
+        } else if (oldDeadline && newDeadline && oldDeadline !== newDeadline) {
+            await logAction(t.projectId, `đổi deadline task "${vals.title}" từ ${formatDateVN(oldDeadline)} sang ${formatDateVN(newDeadline)}`, t.groupId);
+        } else if (oldDeadline && !newDeadline) {
+            await logAction(t.projectId, `xóa deadline của task "${vals.title}"`, t.groupId);
         }
       });
     });
@@ -748,7 +813,7 @@ function renderTask(docSnap) {
     });
   }
 
-  // Cập nhật trạng thái nút comment và thanh tiến độ
+  // Cập nhật trạng thái nút comment, thanh tiến độ và deadline
   const hasComment = t.comment && t.comment.trim().length > 0;
   const commentBtn = row.querySelector(".comment-task");
   if (hasComment) {
@@ -756,10 +821,44 @@ function renderTask(docSnap) {
   } else {
     commentBtn.classList.remove("text-blue-600", "font-bold");
   }
+  
+  // Cập nhật emoji
+  const emojiSpan = row.querySelector(`#task-emoji-${tid}`);
+  if (emojiSpan) {
+    emojiSpan.textContent = t.emoji || '';
+  }
 
   const progressBar = row.querySelector(`#progress-container-${tid} div`);
   if (progressBar) {
-    progressBar.style.width = `${t.progress || 0}%`;
+    progressBar.style.width = `${t.progress || 0}%;`;
+  }
+
+  // Thêm class màu nền cho task nếu có deadline gần kề
+if (t.deadline) {
+    const daysLeft = daysUntil(t.deadline);
+    const deadlineClass = colorClassByDaysLeft(daysLeft);
+
+    // luôn bỏ màu trước khi xử lý
+    row.classList.remove("bg-red-100", "bg-yellow-200", "bg-orange-300");
+
+    // 🚫 Không áp màu nếu task đã Done
+    if (deadlineClass && t.status !== "done") {
+        row.classList.add(deadlineClass);
+    }
+} else {
+    row.classList.remove("bg-red-100", "bg-yellow-200", "bg-orange-300");
+}
+
+
+  const taskInfo = row.querySelector(`#task-info-${tid}`);
+  if (taskInfo) {
+      taskInfo.innerHTML = '';
+      if (t.deadline) {
+          const deadlineSpan = document.createElement('span');
+          deadlineSpan.className = "ml-1 text-gray-700";
+          deadlineSpan.innerHTML = `⏰ ${formatDateVN(t.deadline)}`;
+          taskInfo.appendChild(deadlineSpan);
+      }
   }
 }
 
@@ -838,13 +937,16 @@ function openTaskModal(groupId, projectId) {
   openModal("Thêm Task", [
     { id: "title", placeholder: "Tên Task" },
     { id: "comment", placeholder: "Comment (tùy chọn)", type: "textarea" },
+    { id: "deadline", label: "Hạn chót", type: "date" }, // Thêm trường deadline
     { id: "color", label: "Màu", type: "color" },
     { id: "progress", label: "Tiến độ", type: "range", value: 0 }
   ], async (vals) => {
     if (!isAuthReady) return;
-    await addDoc(collection(db, "tasks"), {
+    const deadline = (vals.deadline && vals.deadline.trim()) ? vals.deadline.trim() : null;
+    const newDocRef = await addDoc(collection(db, "tasks"), {
       title: vals.title,
       comment: vals.comment || "",
+      deadline, // Lưu deadline vào task
       color: vals.color || null,
       progress: parseInt(vals.progress),
       projectId,
@@ -853,7 +955,7 @@ function openTaskModal(groupId, projectId) {
       createdAt: serverTimestamp(),
       createdBy: currentUser?.email || "Ẩn danh"
     });
-    await logAction(projectId, `thêm task mới "${vals.title}"`, groupId);
+    await logAction(projectId, `thêm task mới "${vals.title}"` + (deadline ? ` (hạn chót ${formatDateVN(deadline)})` : ''), groupId);
   });
 }
 
@@ -913,3 +1015,6 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
+
+
