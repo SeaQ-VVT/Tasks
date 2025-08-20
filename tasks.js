@@ -347,12 +347,10 @@ export function showTaskBoard(projectId, projectTitle) {
         <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-400 transition-colors">Hiện log</button>
  
    
-
-     <div id="logEntries" 
-     class="space-y-2 text-sm text-gray-600 hidden" 
-     style="max-height:10cm; overflow-y:auto;">
-     </div>
-
+  <div
+      
+    <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden"></div>
+div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
       <div class="bg-white p-3 rounded-2xl shadow flex flex-col border-4 border-teal-200">
@@ -1148,6 +1146,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
