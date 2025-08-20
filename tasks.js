@@ -215,9 +215,9 @@ function listenForLogs(projectId) {
   logsUnsub = onSnapshot(q, (snapshot) => {
     const logs = [];
     snapshot.forEach((doc) => logs.push(doc.data()));
-    logs.sort((a, b) => b.timestamp - a.timestamp);
+    logs.sort((a, b) => a.timestamp - b.timestamp); // từ cũ -> mới
 
-    // 📌 Render bảng nhật ký (luôn giữ nguyên như cũ)
+    // 📌 Render nhật ký
     const logEntries = document.getElementById("logEntries");
     if (logEntries) {
       logEntries.innerHTML = "";
@@ -230,30 +230,41 @@ function listenForLogs(projectId) {
       });
     }
 
-    // 📌 Toast lần đầu vào: chỉ hiện log mới hơn lastSeen
-    logs.forEach(l => {
+    // 📌 Lần đầu: hiện tất cả log mới hơn lastSeen
+    const newLogs = logs.filter(l => {
       const t = l.timestamp?.toDate ? l.timestamp.toDate().getTime() : 0;
-      if (t > lastSeen) {
-        const userDisplayName = getUserDisplayName(l.user);
-        showToast(`${userDisplayName} đã ${l.action}.`);
-        lastSeen = t;
-        saveLastSeen(projectId, lastSeen);
-      }
+      return t > lastSeen;
+    });
+    newLogs.forEach(l => {
+      const userDisplayName = getUserDisplayName(l.user);
+      showToast(`${userDisplayName} đã ${l.action}.`);
+    });
+    if (newLogs.length > 0) {
+      const newest = newLogs[newLogs.length - 1];
+      lastSeen = newest.timestamp?.toDate ? newest.timestamp.toDate().getTime() : lastSeen;
+      saveLastSeen(projectId, lastSeen);
+    }
+
+    // 📌 Realtime: log mới thêm
+    const addedLogs = snapshot.docChanges()
+      .filter(change => change.type === "added")
+      .map(change => change.doc.data());
+
+    const freshLogs = addedLogs.filter(l => {
+      const t = l.timestamp?.toDate ? l.timestamp.toDate().getTime() : 0;
+      return t > lastSeen;
     });
 
-    // 📌 Toast realtime: log mới thêm
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === "added") {
-        const data = change.doc.data();
-        const t = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : 0;
-        if (t > lastSeen) {
-          const userDisplayName = getUserDisplayName(data.user);
-          showToast(`${userDisplayName} đã ${data.action}.`);
-          lastSeen = t;
-          saveLastSeen(projectId, lastSeen);
-        }
-      }
+    freshLogs.forEach(l => {
+      const userDisplayName = getUserDisplayName(l.user);
+      showToast(`${userDisplayName} đã ${l.action}.`);
     });
+
+    if (freshLogs.length > 0) {
+      const newest = freshLogs[freshLogs.length - 1];
+      lastSeen = newest.timestamp?.toDate ? newest.timestamp.toDate().getTime() : lastSeen;
+      saveLastSeen(projectId, lastSeen);
+    }
   });
 }
 
@@ -1131,6 +1142,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
