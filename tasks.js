@@ -24,13 +24,12 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebas
 
 // ===== Firebase Config (Sử dụng config từ file của bạn) =====
 const firebaseConfig = {
-  apiKey: "AIzaSyBw3hWbWLvr2W2pdPL8_wKNB5x_BcnwrOI",
-  authDomain: "task-806e4.firebaseapp.com",
-  projectId: "task-806e4",
-  storageBucket: "task-806e4.firebasestorage.app",
-  messagingSenderId: "638366751634",
-  appId: "1:638366751634:web:1cff140df54007edecff4b",
-  measurementId: "G-TLJSXWQBZD"
+  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
+  authDomain: "task-manager-d18aa.firebaseapp.com",
+  projectId: "task-manager-d18aa",
+  storageBucket: "task-manager-d18aa.appspot.com",
+  messagingSenderId: "1080268498085",
+  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
 // ===== Khởi tạo Firebase =====
@@ -1118,6 +1117,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
