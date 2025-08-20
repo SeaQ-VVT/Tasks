@@ -194,11 +194,9 @@ let logsUnsub = null;
 function getLastSeenKey(projectId) {
   return `lastSeen_${projectId}`;
 }
-
 function loadLastSeen(projectId) {
   return parseInt(localStorage.getItem(getLastSeenKey(projectId))) || 0;
 }
-
 function saveLastSeen(projectId, ts) {
   localStorage.setItem(getLastSeenKey(projectId), ts);
 }
@@ -217,9 +215,22 @@ function listenForLogs(projectId) {
   logsUnsub = onSnapshot(q, (snapshot) => {
     const logs = [];
     snapshot.forEach((doc) => logs.push(doc.data()));
-    logs.sort((a, b) => a.timestamp - b.timestamp); // từ cũ → mới
+    logs.sort((a, b) => b.timestamp - a.timestamp);
 
-    // 🔹 Lần đầu vào: show tất cả log > lastSeen
+    // 📌 Render bảng nhật ký (luôn giữ nguyên như cũ)
+    const logEntries = document.getElementById("logEntries");
+    if (logEntries) {
+      logEntries.innerHTML = "";
+      logs.forEach((data) => {
+        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
+        const userDisplayName = getUserDisplayName(data.user);
+        const logItem = document.createElement("div");
+        logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
+        logEntries.appendChild(logItem);
+      });
+    }
+
+    // 📌 Toast lần đầu vào: chỉ hiện log mới hơn lastSeen
     logs.forEach(l => {
       const t = l.timestamp?.toDate ? l.timestamp.toDate().getTime() : 0;
       if (t > lastSeen) {
@@ -230,7 +241,7 @@ function listenForLogs(projectId) {
       }
     });
 
-    // 🔹 Realtime: chỉ log mới thêm
+    // 📌 Toast realtime: log mới thêm
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         const data = change.doc.data();
@@ -1120,6 +1131,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
