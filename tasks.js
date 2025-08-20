@@ -350,6 +350,10 @@ export function showTaskBoard(projectId, projectTitle) {
         <h3 class="font-bold text-gray-800 mb-2">Tiến độ tổng thể dự án</h3>
         <canvas id="project-progress-chart" class="w-full h-64"></canvas>
     </div>
+
+        <div class="mt-8 p-4 bg-gray-100 rounded-lg text-center text-gray-500">
+      &copy; Thiết kế bỡi: Nguyễn Văn Yên.
+    </div>
   `;
 
   // Thêm Chart.js CDN
@@ -1116,6 +1120,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
