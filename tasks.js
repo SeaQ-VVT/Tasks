@@ -189,12 +189,21 @@ async function logAction(projectId, action, groupId = null) {
   });
 }
 
-// Biến lưu trữ listener logs để có thể hủy khi đổi dự án
 let logsUnsub = null;
-let lastLogTime = null; // 🔹 Lưu timestamp của log mới nhất
+
+function getLastSeenKey(projectId) {
+  return `lastSeen_${projectId}`;
+}
+
+function loadLastSeen(projectId) {
+  return parseInt(localStorage.getItem(getLastSeenKey(projectId))) || 0;
+}
+
+function saveLastSeen(projectId, ts) {
+  localStorage.setItem(getLastSeenKey(projectId), ts);
+}
 
 function listenForLogs(projectId) {
-  // Hủy listener cũ để không bị nhận thông báo từ dự án khác
   if (logsUnsub) {
     logsUnsub();
     logsUnsub = null;
@@ -203,45 +212,34 @@ function listenForLogs(projectId) {
   const logsCol = collection(db, "logs");
   const q = query(logsCol, where("projectId", "==", projectId));
 
+  let lastSeen = loadLastSeen(projectId);
+
   logsUnsub = onSnapshot(q, (snapshot) => {
-    const logEntries = document.getElementById("logEntries");
     const logs = [];
-
     snapshot.forEach((doc) => logs.push(doc.data()));
-    logs.sort((a, b) => b.timestamp - a.timestamp);
+    logs.sort((a, b) => a.timestamp - b.timestamp); // từ cũ → mới
 
-    // Render bảng log
-    if (logEntries) {
-      logEntries.innerHTML = "";
-      logs.forEach((data) => {
-        const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
-        const userDisplayName = getUserDisplayName(data.user);
-        const logItem = document.createElement("div");
-        logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
-        logEntries.appendChild(logItem);
-      });
-    }
-
-    // 🔹 Chỉ toast nếu có log mới hơn log đã lưu
-    if (logs.length > 0) {
-      const newest = logs[0];
-      const newTime = newest.timestamp?.toDate ? newest.timestamp.toDate().getTime() : null;
-      if (!lastLogTime || (newTime && newTime > lastLogTime)) {
-        const userDisplayName = getUserDisplayName(newest.user);
-        showToast(`${userDisplayName} đã ${newest.action}.`);
-        lastLogTime = newTime;
+    // 🔹 Lần đầu vào: show tất cả log > lastSeen
+    logs.forEach(l => {
+      const t = l.timestamp?.toDate ? l.timestamp.toDate().getTime() : 0;
+      if (t > lastSeen) {
+        const userDisplayName = getUserDisplayName(l.user);
+        showToast(`${userDisplayName} đã ${l.action}.`);
+        lastSeen = t;
+        saveLastSeen(projectId, lastSeen);
       }
-    }
+    });
 
-    // 🔹 Sau đó: chỉ toast log mới được thêm
+    // 🔹 Realtime: chỉ log mới thêm
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         const data = change.doc.data();
-        const time = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : null;
-        if (!lastLogTime || (time && time > lastLogTime)) {
+        const t = data.timestamp?.toDate ? data.timestamp.toDate().getTime() : 0;
+        if (t > lastSeen) {
           const userDisplayName = getUserDisplayName(data.user);
           showToast(`${userDisplayName} đã ${data.action}.`);
-          lastLogTime = time;
+          lastSeen = t;
+          saveLastSeen(projectId, lastSeen);
         }
       }
     });
@@ -1118,6 +1116,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
