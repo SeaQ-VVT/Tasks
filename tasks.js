@@ -24,12 +24,13 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebas
 
 // ===== Firebase Config (Sử dụng config từ file của bạn) =====
 const firebaseConfig = {
-  apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
-  authDomain: "task-manager-d18aa.firebaseapp.com",
-  projectId: "task-manager-d18aa",
-  storageBucket: "task-manager-d18aa.appspot.com",
-  messagingSenderId: "1080268498085",
-  appId: "1:1080268498085:web:767434c6a2c013b961d94c"
+  apiKey: "AIzaSyBw3hWbWLvr2W2pdPL8_wKNB5x_BcnwrOI",
+  authDomain: "task-806e4.firebaseapp.com",
+  projectId: "task-806e4",
+  storageBucket: "task-806e4.firebasestorage.app",
+  messagingSenderId: "638366751634",
+  appId: "1:638366751634:web:1cff140df54007edecff4b",
+  measurementId: "G-TLJSXWQBZD"
 };
 
 // ===== Khởi tạo Firebase =====
@@ -84,17 +85,30 @@ function openModal(title, fields, onSave) {
           <label for="${f.id}" class="text-gray-700">Tiến độ (<span id="progress-value-${f.id}">${f.value || 0}</span>%)</label>
           <input id="${f.id}" type="range" min="0" max="100" value="${f.value || 0}" class="w-full">
         </div>`;
-    } else if (f.type === "date") {
-      fieldsDiv.innerHTML += `
-        <div class="flex flex-col">
-          <label for="${f.id}" class="text-gray-700">${f.label || 'Hạn Chót'}:</label>
-          <input id="${f.id}" type="date" class="border p-2 w-full rounded-md" value="${f.value || ""}">
-        </div>`;
+} else if (f.type === "date") {
+  fieldsDiv.innerHTML += `
+    <div class="flex flex-col">
+      <label for="${f.id}" class="text-gray-700">${f.label || 'Hạn Chót'}:</label>
+      <div class="flex items-center gap-2">
+        <input id="${f.id}" type="date" class="border p-2 w-full rounded-md" value="${f.value || ""}">
+        <button type="button" id="clear-${f.id}" class="px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200">Xóa</button>
+      </div>
+    </div>`;
     } else {
       fieldsDiv.innerHTML += `<input id="${f.id}" type="text" placeholder="${f.placeholder}" class="border p-2 w-full rounded-md" value="${f.value || ""}">`;
     }
   });
-
+// Gắn sự kiện cho nút "Xóa deadline"
+fields.forEach(f => {
+  if (f.type === "date") {
+    const clearBtn = document.getElementById(`clear-${f.id}`);
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        document.getElementById(f.id).value = "";
+      });
+    }
+  }
+});
   modal.classList.remove("hidden");
 
   const progressInput = document.getElementById("progress");
@@ -809,6 +823,15 @@ row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
         } else {
             updatePayload.deadline = deleteField();
         }
+        // Check deadline Task <= Group
+const gRef = doc(db, "groups", t.groupId);
+const gSnap = await getDoc(gRef);
+const gDeadline = gSnap.exists() ? gSnap.data().deadline : null;
+
+if (gDeadline && newDeadline && newDeadline > gDeadline) {
+  alert("❌ Deadline của Task không thể vượt quá deadline của Group!");
+  return;
+}
 
         await updateDoc(doc(db, "tasks", tid), updatePayload);
 
@@ -923,6 +946,16 @@ async function addGroup(projectId) {
   ], async (vals) => {
     if (!isAuthReady) return;
     const deadline = vals.deadline && vals.deadline.trim() ? vals.deadline.trim() : null;
+        // 🔽 Check deadline Group <= Project
+    const pRef = doc(db, "projects", projectId);
+    const pSnap = await getDoc(pRef);
+    const pEnd = pSnap.exists() ? pSnap.data().endDate : null;
+
+    if (pEnd && deadline && deadline > pEnd) {
+      alert("❌ Deadline của Group không thể vượt quá deadline của Project!");
+      return;
+    }
+
     const newDocRef = await addDoc(collection(db, "groups"), {
       title: vals.title,
       projectId,
@@ -954,7 +987,14 @@ async function editGroup(groupId, g) {
       updatedBy: currentUser?.email || "Ẩn danh",
       ...(newDeadline ? { deadline: newDeadline } : { deadline: deleteField() })
     };
+const pRef = doc(db, "projects", g.projectId);
+const pSnap = await getDoc(pRef);
+const pEnd = pSnap.exists() ? pSnap.data().endDate : null;
 
+if (pEnd && newDeadline && newDeadline > pEnd) {
+  alert("❌ Deadline của Group không thể vượt quá deadline của Project!");
+  return;
+}
     await updateDoc(doc(db, "groups", groupId), payload);
 
     if (g.title !== vals.title) {
@@ -996,6 +1036,16 @@ function openTaskModal(groupId, projectId) {
   ], async (vals) => {
     if (!isAuthReady) return;
     const deadline = (vals.deadline && vals.deadline.trim()) ? vals.deadline.trim() : null;
+    // 🔽 Thêm đoạn check ở đây
+const gRef = doc(db, "groups", groupId);
+const gSnap = await getDoc(gRef);
+const gDeadline = gSnap.exists() ? gSnap.data().deadline : null;
+
+if (gDeadline && deadline && deadline > gDeadline) {
+  alert("❌ Deadline của Task không thể vượt quá deadline của Group!");
+  return;
+}
+
     const newDocRef = await addDoc(collection(db, "tasks"), {
       title: vals.title,
       comment: vals.comment || "",
@@ -1068,6 +1118,8 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
+
 
 
 
