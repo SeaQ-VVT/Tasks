@@ -177,6 +177,7 @@ async function logAction(projectId, action, groupId = null) {
 }
 
 // Biến lưu trữ listener logs để có thể hủy khi đổi dự án
+// Biến lưu trữ listener logs để có thể hủy khi đổi dự án
 let logsUnsub = null;
 
 function listenForLogs(projectId) {
@@ -193,11 +194,13 @@ function listenForLogs(projectId) {
 
   logsUnsub = onSnapshot(q, (snapshot) => {
     const logEntries = document.getElementById("logEntries");
-    if (logEntries) {
-      const logs = [];
-      snapshot.forEach((doc) => logs.push(doc.data()));
-      logs.sort((a, b) => b.timestamp - a.timestamp);
+    const logs = [];
 
+    snapshot.forEach((doc) => logs.push(doc.data()));
+    logs.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Render bảng log
+    if (logEntries) {
       logEntries.innerHTML = "";
       logs.forEach((data) => {
         const timestamp = data.timestamp?.toDate ? data.timestamp.toDate().toLocaleString() : "-";
@@ -208,11 +211,18 @@ function listenForLogs(projectId) {
       });
     }
 
+    // 🔹 Lần đầu vào: chỉ toast log mới nhất
     if (initial) {
       initial = false;
+      if (logs.length > 0) {
+        const newest = logs[0];
+        const userDisplayName = getUserDisplayName(newest.user);
+        showToast(`${userDisplayName} đã ${newest.action}.`);
+      }
       return;
     }
 
+    // 🔹 Sau đó: chỉ toast log mới được thêm
     snapshot.docChanges().forEach((change) => {
       if (change.type === "added") {
         const data = change.doc.data();
@@ -222,6 +232,7 @@ function listenForLogs(projectId) {
     });
   });
 }
+
 
 // ===== Cấu hình và Helpers cho Deadline =====
 const DEADLINE_CFG = {
@@ -690,51 +701,87 @@ function renderTask(docSnap) {
       e.dataTransfer.setData("taskId", tid);
     });
     
-    // Sự kiện chọn emoji
-    row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
-      e.stopPropagation(); // Ngăn sự kiện drag
-      const emojiList = ["👍", "🎉", "🔥", "🤔", "👀", "🚀", "❤️", "💯", "✅", "⚠️", "❌"];
-      const picker = document.createElement('div');
-      picker.className = 'absolute z-10 bg-white shadow-lg rounded p-2 flex flex-wrap gap-1';
-      
-      // Lấy vị trí của nút emoji-picker-btn để đặt pop-up
-      const rect = e.target.getBoundingClientRect();
-      picker.style.top = `${rect.bottom + window.scrollY + 5}px`;
-      picker.style.left = `${rect.left + window.scrollX}px`;
-      
-      emojiList.forEach(emoji => {
-        const btn = document.createElement('button');
-        btn.textContent = emoji;
-        btn.className = 'hover:bg-gray-200 p-1 rounded';
-btn.onclick = async () => {
-  await updateDoc(doc(db, "tasks", tid), { emoji: emoji });
-  picker.remove();
+// Sự kiện chọn emoji
+row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
+  e.stopPropagation(); // Ngăn sự kiện drag
 
-  const userDisplayName = getUserDisplayName(currentUser?.email || "Ẩn danh");
+  // Danh sách emoji
+  const emojiList = ["👍", "🎉", "🔥", "🤔", "👀", "🚀", "❤️", "💯", "✅", "⚠️"];
 
-  // Lấy thông tin group
-  const groupSnap = await getDoc(doc(db, "groups", t.groupId));
-  const groupData = groupSnap.exists() ? groupSnap.data() : { title: "Không rõ" };
+  const picker = document.createElement('div');
+  picker.className = 'absolute z-10 bg-white shadow-lg rounded p-2 flex flex-wrap gap-1';
 
-  // 🔹 Thông báo nhanh
- // showToast(`${userDisplayName} thêm ${emoji} vào "${t.title}" (Group: ${groupData.title})`);
+  // Lấy vị trí của nút emoji-picker-btn để đặt pop-up
+  const rect = e.target.getBoundingClientRect();
+  picker.style.top = `${rect.bottom + window.scrollY + 5}px`;
+  picker.style.left = `${rect.left + window.scrollX}px`;
 
-  // 🔹 Ghi vào log (giống style cũ)
-  await logAction(t.projectId, `thêm cảm xúc ${emoji} vào task "${t.title}"`, t.groupId);
-};
+  // 🔹 Render danh sách emoji
+  emojiList.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.textContent = emoji;
+    btn.className = 'hover:bg-gray-200 p-1 rounded';
+    btn.onclick = async () => {
+      const userEmail = currentUser?.email || "Ẩn danh";
 
-        picker.appendChild(btn);
-      });
-      document.body.appendChild(picker);
-      
-      const outsideClick = (event) => {
-        if (!picker.contains(event.target) && event.target !== row.querySelector(".emoji-picker-btn")) {
-          picker.remove();
-          document.removeEventListener('click', outsideClick);
-        }
-      };
-      document.addEventListener('click', outsideClick);
-    });
+      // Lấy dữ liệu task hiện tại
+      const taskRef = doc(db, "tasks", tid);
+      const taskSnap = await getDoc(taskRef);
+      const taskData = taskSnap.exists() ? taskSnap.data() : {};
+
+      // Reactions hiện có
+      let reactions = taskData.emoji || {};
+
+      // Ghi đè reaction của user hiện tại
+      reactions[userEmail] = emoji;
+
+      // Cập nhật Firestore
+      await updateDoc(taskRef, { emoji: reactions });
+      picker.remove();
+
+      // Ghi log
+      await logAction(t.projectId, `thêm cảm xúc ${emoji} vào task "${t.title}"`, t.groupId);
+    };
+    picker.appendChild(btn);
+  });
+
+  // 🔹 Thêm nút "Bỏ cảm xúc"
+  const removeBtn = document.createElement('button');
+  removeBtn.textContent = "Bỏ cảm xúc";
+  removeBtn.className = 'bg-red-100 hover:bg-red-200 text-red-600 px-2 py-1 rounded mt-2 w-full';
+  removeBtn.onclick = async () => {
+    const userEmail = currentUser?.email || "Ẩn danh";
+
+    const taskRef = doc(db, "tasks", tid);
+    const taskSnap = await getDoc(taskRef);
+    const taskData = taskSnap.exists() ? taskSnap.data() : {};
+
+    let reactions = taskData.emoji || {};
+
+    // ❌ Xoá cảm xúc của user
+    delete reactions[userEmail];
+
+    await updateDoc(taskRef, { emoji: reactions });
+    picker.remove();
+
+    await logAction(t.projectId, `bỏ cảm xúc khỏi task "${t.title}"`, t.groupId);
+  };
+  picker.appendChild(removeBtn);
+
+  document.body.appendChild(picker);
+
+  // 🔹 Đóng picker khi click ra ngoài
+  const outsideClick = (event) => {
+    if (!picker.contains(event.target) && event.target !== row.querySelector(".emoji-picker-btn")) {
+      picker.remove();
+      document.removeEventListener('click', outsideClick);
+    }
+  };
+  document.addEventListener('click', outsideClick);
+});
+
+
+
 
     // Sự kiện click nút sửa
     row.querySelector(".edit-task").addEventListener("click", () => {
@@ -823,10 +870,16 @@ btn.onclick = async () => {
   }
   
   // Cập nhật emoji
-  const emojiSpan = row.querySelector(`#task-emoji-${tid}`);
-  if (emojiSpan) {
+const emojiSpan = row.querySelector(`#task-emoji-${tid}`);
+if (emojiSpan) {
+  if (t.emoji && typeof t.emoji === "object") {
+    // Hiển thị tất cả emoji của mọi user
+    emojiSpan.textContent = Object.values(t.emoji).join(" ");
+  } else {
     emojiSpan.textContent = t.emoji || '';
   }
+}
+
 
   const progressBar = row.querySelector(`#progress-container-${tid} div`);
   if (progressBar) {
@@ -1015,6 +1068,11 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
+
+
+
+
 
 
 
