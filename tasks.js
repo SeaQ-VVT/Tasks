@@ -346,11 +346,12 @@ export function showTaskBoard(projectId, projectTitle) {
         <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
         <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-400 transition-colors">Hiện log</button>
  
+   
+
      <div id="logEntries" 
-     class="space-y-2 text-sm text-gray-600 hidden max-h-[10cm] overflow-y-auto break-words">
-    </div>
-
-
+     class="space-y-2 text-sm text-gray-600 hidden" 
+     style="max-height:10cm; overflow-y:auto;">
+     </div>
 
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
@@ -1147,6 +1148,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
