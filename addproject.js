@@ -15,7 +15,7 @@ import {
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { showTaskBoard, isGuestUser } from "./tasks.js";
 
@@ -192,7 +192,7 @@ function setupProjectListener() {
     projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
       const projectCard = renderProject(doc);
-      projectArea.appendChild(projectCard); // ĐÃ ĐẶT LẠI VỊ TRÍ ĐÚNG
+      projectArea.appendChild(projectCard);
 
       updateCountdownAndColor(projectCard, doc.data().endDate);
       setInterval(() => updateCountdownAndColor(projectCard, doc.data().endDate), 60000);
