@@ -602,27 +602,33 @@ function renderGroup(docSnap) {
 
   const deadlineText = g.deadline ? `<span class="text-xs text-gray-500 ml-2">⏰ ${formatDateVN(g.deadline)}</span>` : "";
 
-  div.innerHTML = `
-    <div class="flex justify-between items-center">
-      <span class="font-semibold text-blue-700">${g.title}${deadlineText}</span>
-      <div class="space-x-1">
-        <button class="edit-group text-yellow-600 hover:text-yellow-700" title="Sửa group">✏️</button>
-        <button class="delete-group text-red-600 hover:text-red-700" title="Xóa group">🗑️</button>
-      </div>
-    </div>
-    <button class="add-task text-green-600 text-xs mt-1 hover:text-green-700">+ Task</button>
-    <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
-    
-    <div class="progress-bar-container mt-4" id="group-progress-container-${gid}">
-      <div class="flex items-center mb-1">
-        <span class="text-sm font-semibold text-gray-700 mr-2">Tiến độ nhóm:</span>
-        <span id="group-progress-value-${gid}" class="text-sm font-medium text-blue-500">0%</span>
-      </div>
-      <div class="w-full bg-gray-200 rounded-full h-2">
-        <div id="group-progress-bar-${gid}" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%;"></div>
-      </div>
-    </div>
+let groupButtons = "";
+if (!window.isGuestMode) {
+  groupButtons = `
+    <button class="edit-group text-yellow-600 hover:text-yellow-700" title="Sửa group">✏️</button>
+    <button class="delete-group text-red-600 hover:text-red-700" title="Xóa group">🗑️</button>
   `;
+}
+
+div.innerHTML = `
+  <div class="flex justify-between items-center">
+    <span class="font-semibold text-blue-700">${g.title}${deadlineText}</span>
+    <div class="space-x-1">${groupButtons}</div>
+  </div>
+  ${!window.isGuestMode ? `<button class="add-task text-green-600 text-xs mt-1 hover:text-green-700">+ Task</button>` : ""}
+  <div id="tasks-${gid}" class="space-y-1 mt-2"></div>
+  
+  <div class="progress-bar-container mt-4" id="group-progress-container-${gid}">
+    <div class="flex items-center mb-1">
+      <span class="text-sm font-semibold text-gray-700 mr-2">Tiến độ nhóm:</span>
+      <span id="group-progress-value-${gid}" class="text-sm font-medium text-blue-500">0%</span>
+    </div>
+    <div class="w-full bg-gray-200 rounded-full h-2">
+      <div id="group-progress-bar-${gid}" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%;"></div>
+    </div>
+  </div>
+`;
+
 
   document.getElementById("groupContainer").appendChild(div);
 
@@ -716,24 +722,30 @@ function renderTask(docSnap) {
     row.style.borderLeft = `4px solid ${t.color || '#e5e7eb'}`;
     row.draggable = true;
 
-    row.innerHTML = `
-      <div class="flex justify-between items-center w-full">
-        <div class="flex items-center">
-            <span class="font-medium">${t.title}</span>
-            <span id="task-emoji-${tid}" class="ml-1 flex items-center"></span>
-        </div>
-        <div class="space-x-1 flex-shrink-0">
-          <button class="emoji-picker-btn text-gray-400 hover:text-yellow-600" title="Chọn cảm xúc">🙂</button>
-          <button class="edit-task text-yellow-600 hover:text-yellow-700" title="Sửa">✏️</button>
-          <button class="comment-task text-gray-400 hover:text-blue-600" title="Comment">💬</button>
-          <button class="delete-task text-red-600 hover:text-red-700" title="Xóa">🗑️</button>
-        </div>
-      </div>
-      <div id="task-info-${tid}" class="flex items-center text-xs text-gray-500 mt-1">
-          </div>
-      <div id="progress-container-${tid}" class="mt-1 w-full bg-gray-200 rounded-full h-2">
-        <div class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: ${t.progress || 0}%;"></div>
-      </div>`;
+let taskButtons = "";
+if (!window.isGuestMode) {
+  taskButtons = `
+    <button class="emoji-picker-btn text-gray-400 hover:text-yellow-600" title="Chọn cảm xúc">😊</button>
+    <button class="edit-task text-yellow-600 hover:text-yellow-700" title="Sửa">✏️</button>
+    <button class="comment-task text-gray-400 hover:text-blue-600" title="Comment">💬</button>
+    <button class="delete-task text-red-600 hover:text-red-700" title="Xóa">🗑️</button>
+  `;
+}
+
+row.innerHTML = `
+  <div class="flex justify-between items-center w-full">
+    <div class="flex items-center">
+      <span class="font-medium">${t.title}</span>
+      <span id="task-emoji-${tid}" class="ml-1 flex items-center"></span>
+    </div>
+    <div class="space-x-1 flex-shrink-0">${taskButtons}</div>
+  </div>
+  <div id="task-info-${tid}" class="flex items-center text-xs text-gray-500 mt-1"></div>
+  <div id="progress-container-${tid}" class="mt-1 w-full bg-gray-200 rounded-full h-2">
+    <div class="bg-green-600 h-2 rounded-full transition-all duration-300" style="width: ${t.progress || 0}%;"></div>
+  </div>
+`;
+
 
     col.appendChild(row);
 
@@ -1167,6 +1179,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
