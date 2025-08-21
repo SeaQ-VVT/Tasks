@@ -15,9 +15,9 @@ import {
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { showTaskBoard, isGuestUser } from "./tasks.js"; // SỬA DÒNG NÀY
+import { showTaskBoard, isGuestUser } from "./tasks.js";
 
 // Debug log
 console.log("addproject.js loaded OK");
@@ -31,6 +31,7 @@ const firebaseConfig = {
   messagingSenderId: "1080268498085",
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
+
 // ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -133,8 +134,6 @@ function updateCountdownAndColor(projectCard, endDate) {
   let countdownElement = projectCard.querySelector(".countdown");
   if (!countdownElement) {
     countdownElement = document.createElement("p");
-    //countdownElement.className = "text-gray-800 text-3xl countdown";
-    // Thêm các lớp để tạo nền màu xanh và chữ trắng
     countdownElement.className = "bg-blue-500 text-white px-3 py-1 rounded-full text-lg countdown";
     projectCard.insertBefore(countdownElement, projectCard.querySelector("div.flex"));
   }
@@ -161,7 +160,6 @@ function renderProject(docSnap) {
   
   const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
 
-  // Thêm logic để kiểm tra tài khoản khách và chỉ hiển thị nút View
   const actionButtonsHtml = isGuestUser
   ? `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>`
   : `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
@@ -184,14 +182,6 @@ function renderProject(docSnap) {
 
   return projectCard;
 }
-  projectArea.appendChild(projectCard);
-
-  // Cập nhật thời gian đếm ngược và màu sắc
-  updateCountdownAndColor(projectCard, data.endDate);
-
-  // Cập nhật realtime cho đếm ngược
-  setInterval(() => updateCountdownAndColor(projectCard, data.endDate), 60000); // Cập nhật mỗi phút
-}
 
 // ===== Real-time listener =====
 function setupProjectListener() {
@@ -201,7 +191,12 @@ function setupProjectListener() {
   onSnapshot(q, (snapshot) => {
     projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
-      renderProject(doc);
+      const projectCard = renderProject(doc);
+      projectArea.appendChild(projectCard); // ĐÃ DI CHUYỂN DÒNG NÀY VÀO ĐÂY
+
+      // Cập nhật thời gian đếm ngược và màu sắc
+      updateCountdownAndColor(projectCard, doc.data().endDate);
+      setInterval(() => updateCountdownAndColor(projectCard, doc.data().endDate), 60000); // Cập nhật mỗi phút
     });
 
     document.querySelectorAll(".edit-btn").forEach((btn) => {
@@ -474,7 +469,7 @@ addProjectBtn.addEventListener("click", () => {
 });
 
 // ===== Auth listener =====
-auth.onAuthStateChanged((user) => {
+onAuthStateChanged(auth, (user) => {
   if (user) {
     addProjectBtn.classList.remove("hidden");
     setupProjectListener();
@@ -521,8 +516,6 @@ function setupSidebar() {
     sidebar.classList.toggle("hidden");
   });
 
-
-
   const projectsCol = collection(db, "projects");
   const q = query(projectsCol, orderBy("createdAt", "desc"));
 
@@ -545,12 +538,3 @@ function setupSidebar() {
     });
   });
 }
-
-
-
-
-
-
-
-
-
