@@ -160,6 +160,25 @@
     } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
     import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
+  // ===== Guest Mode =====
+window.isGuestMode = false;
+
+document.getElementById("guestBtn").addEventListener("click", () => {
+  window.isGuestMode = true;
+  document.getElementById("loginSection").classList.add("hidden");
+  document.getElementById("mainContent").classList.remove("hidden");
+
+  document.getElementById("status").textContent = "Guest (view only)";
+  document.getElementById("navButtons").classList.remove("hidden");
+
+  // Ẩn nút cho Guest
+  document.getElementById("showCreateUserModalBtn").classList.add("hidden");
+  document.getElementById("addProjectBtn").classList.add("hidden");
+  document.getElementById("showChangePassModalBtn").classList.add("hidden");
+});
+
+    
+
 const firebaseConfig = {
   apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
   authDomain: "task-manager-d18aa.firebaseapp.com",
@@ -381,6 +400,7 @@ const firebaseConfig = {
   <script type="module" src="tasks.js"></script>
 </body>
 </html>
+
 
 
 
