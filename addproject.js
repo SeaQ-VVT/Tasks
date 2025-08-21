@@ -17,7 +17,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { showTaskBoard } from "./tasks.js";
+import { showTaskBoard, isGuestUser } from "./tasks.js"; // SỬA DÒNG NÀY
 
 // Debug log
 console.log("addproject.js loaded OK");
@@ -157,9 +157,17 @@ function renderProject(docSnap) {
 
   const projectCard = document.createElement("div");
   projectCard.className =
-   "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-110 mb-4";
+    "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-110 mb-4";
   
   const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
+
+  // Thêm logic để kiểm tra tài khoản khách và chỉ hiển thị nút View
+  const actionButtonsHtml = isGuestUser
+  ? `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>`
+  : `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+     <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
+     <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
+     <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>`;
 
   projectCard.innerHTML = `
     <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
@@ -170,12 +178,12 @@ function renderProject(docSnap) {
     <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
     <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
     <div class="flex space-x-2 mt-2">
-      <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
-      <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
-      <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
-      <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
+      ${actionButtonsHtml}
     </div>
   `;
+
+  return projectCard;
+}
   projectArea.appendChild(projectCard);
 
   // Cập nhật thời gian đếm ngược và màu sắc
@@ -537,6 +545,7 @@ function setupSidebar() {
     });
   });
 }
+
 
 
 
