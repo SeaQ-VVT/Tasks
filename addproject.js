@@ -510,15 +510,8 @@ function setupSidebar() {
   }
 
 homeIcon.addEventListener("click", () => {
-  // Hiển thị sidebar
-  sidebar.classList.remove("hidden");
-
-  // Tự động ẩn sidebar sau 2 giây (2000ms)
-  setTimeout(() => {
-    sidebar.classList.add("hidden");
-  }, 2000);
+  sidebar.classList.toggle("hidden");
 });
-
 
   const projectsCol = collection(db, "projects");
   const q = query(projectsCol, orderBy("createdAt", "desc"));
@@ -542,6 +535,7 @@ homeIcon.addEventListener("click", () => {
     });
   });
 }
+
 
 
 
