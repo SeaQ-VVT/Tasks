@@ -56,7 +56,6 @@
         <button id="showChangePassModalBtn" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition-colors">Change Password</button>
         <button id="showCreateUserModalBtn" class="bg-green-500 hover:bg-green-600 px-4 py-2 rounded-lg font-medium transition-colors hidden">Create New User</button>
         <button id="logoutBtn" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-medium transition-colors">Log out</button>
-      
       </div>
     </div>
   </div>
@@ -69,7 +68,6 @@
         <input id="loginUsername" type="text" placeholder="Username (e.g., admin)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
         <input id="loginPassword" type="password" placeholder="Password" class="w-full mt-3 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200">
         <button id="loginBtn" class="w-full p-3 mt-4 text-white bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition duration-200">Sign in</button>
-        <button id="guestBtn" class="w-full p-3 mt-2 text-white bg-gray-500 hover:bg-gray-600 rounded-lg font-medium">  Vào với tư cách Guest</button>
       </div>
 
       <!-- Main Content -->
@@ -160,25 +158,6 @@
       EmailAuthProvider, reauthenticateWithCredential
     } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
     import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
-  // ===== Guest Mode =====
-window.isGuestMode = false;
-
-document.getElementById("guestBtn").addEventListener("click", () => {
-  window.isGuestMode = true;
-  document.getElementById("loginSection").classList.add("hidden");
-  document.getElementById("mainContent").classList.remove("hidden");
-
-  document.getElementById("status").textContent = "Guest (view only)";
-  document.getElementById("navButtons").classList.remove("hidden");
-
-  // Ẩn nút cho Guest
-  document.getElementById("showCreateUserModalBtn").classList.add("hidden");
-  document.getElementById("addProjectBtn").classList.add("hidden");
-  document.getElementById("showChangePassModalBtn").classList.add("hidden");
-});
-
-    
 
 const firebaseConfig = {
   apiKey: "AIzaSyCW49METqezYoUKSC1N0Pi3J83Ptsf9hA8",
@@ -401,9 +380,6 @@ const firebaseConfig = {
   <script type="module" src="tasks.js"></script>
 </body>
 </html>
-
-
-
 
 
 

@@ -161,29 +161,21 @@ function renderProject(docSnap) {
   
   const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
 
-let buttons = `
-  <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
-`;
-
-if (!window.isGuestMode) {
-  buttons += `
-    <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
-    <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
-    <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
+  projectCard.innerHTML = `
+    <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
+    <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
+    <p class="text-gray-500 text-sm"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Ghi chú:</b> ${data.comment || "-"}</p>
+    <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
+    <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
+    <div class="flex space-x-2 mt-2">
+      <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+      <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
+      <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
+      <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
+    </div>
   `;
-}
-
-projectCard.innerHTML = `
-  <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
-  <p class="text-gray-600 mb-2">${data.description || "Chưa có mô tả."}</p>
-  <p class="text-gray-500 text-sm mb-1"><b>Bắt đầu:</b> ${data.startDate || "-"}</p>
-  <p class="text-gray-500 text-sm mb-1"><b>Kết thúc:</b> ${data.endDate || "-"}</p>
-  <p class="text-gray-500 text-sm mb-1"><b>Ghi chú:</b> ${data.comment || "-"}</p>
-  <p class="text-gray-500 text-sm mb-1"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
-  <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
-  <div class="flex space-x-2 mt-2">${buttons}</div>
-`;
-
   projectArea.appendChild(projectCard);
 
   // Cập nhật thời gian đếm ngược và màu sắc
@@ -545,7 +537,6 @@ function setupSidebar() {
     });
   });
 }
-
 
 
 
