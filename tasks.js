@@ -32,6 +32,7 @@ const firebaseConfig = {
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
 
+
 // ===== Khởi tạo Firebase =====
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -227,7 +228,9 @@ function listenForLogs(projectId) {
         const logItem = document.createElement("div");
         logItem.textContent = `[${timestamp}] ${userDisplayName} đã ${data.action}.`;
         //logEntries.appendChild(logItem);
+        
         logEntries.prepend(logItem);
+        
       });
     }
 
@@ -268,6 +271,7 @@ function listenForLogs(projectId) {
     }
   });
 }
+
 
 // ===== Cấu hình và Helpers cho Deadline =====
 const DEADLINE_CFG = {
@@ -341,18 +345,14 @@ export function showTaskBoard(projectId, projectTitle) {
   taskBoard.innerHTML = `
     <h2 class="text-xl font-bold mb-4">Bạn đang ở dự án: ${projectTitle}</h2>
 
-
-<div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
+   <div id="logArea" class="mt-4 bg-gray-100 p-4 rounded-lg">
   <div class="flex justify-between items-center mb-2">
     <h4 class="font-semibold text-gray-700">Nhật ký hoạt động</h4>
     <button id="toggleLogBtn" class="bg-gray-300 text-gray-700 px-2 py-1 rounded text-xs hover:bg-gray-400 transition-colors">Hiện log</button>
   </div>
   <div id="logEntries" class="space-y-2 text-sm text-gray-600 hidden h-[10cm] overflow-y-auto"></div>
 </div>
-   
 
-
-    
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 w-full mt-4">
       <div class="bg-white p-3 rounded-2xl shadow flex flex-col border-4 border-teal-200">
         <div class="flex justify-between items-center mb-2">
@@ -377,8 +377,7 @@ export function showTaskBoard(projectId, projectTitle) {
         <h3 class="font-bold text-gray-800 mb-2">Tiến độ tổng thể dự án</h3>
         <canvas id="project-progress-chart" class="w-full h-64"></canvas>
     </div>
-
-        <div class="mt-8 p-4 bg-gray-100 rounded-lg text-center text-gray-500">
+        <div class="mt-8 p-4 bg-gray-200 rounded-lg text-center text-blue-500">
       &copy; Thiết kế bỡi: Nguyễn Văn Yên.
     </div>
   `;
@@ -720,8 +719,8 @@ function renderTask(docSnap) {
     row.innerHTML = `
       <div class="flex justify-between items-center w-full">
         <div class="flex items-center">
-            <span class="truncate font-medium">${t.title}</span>
-            <span id="task-emoji-${tid}" class="ml-1">${t.emoji || ''}</span>
+            <span class="font-medium">${t.title}</span>
+            <span id="task-emoji-${tid}" class="ml-1 flex items-center"></span>
         </div>
         <div class="space-x-1 flex-shrink-0">
           <button class="emoji-picker-btn text-gray-400 hover:text-yellow-600" title="Chọn cảm xúc">🙂</button>
@@ -749,8 +748,7 @@ row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
   e.stopPropagation(); // Ngăn sự kiện drag
 
   // Danh sách emoji
-  const emojiList = ["👍", "🎉", "🔥", "🤔", "👀", "🚀", "❤️", "💯", "✅", "⚠️"];
-
+  const emojiList = ["❤️", "👍", "😄", "😢"];
   const picker = document.createElement('div');
   picker.className = 'absolute z-10 bg-white shadow-lg rounded p-2 flex flex-wrap gap-1';
 
@@ -875,7 +873,7 @@ if (gDeadline && newDeadline && newDeadline > gDeadline) {
         } else if (oldDeadline && newDeadline && oldDeadline !== newDeadline) {
             await logAction(t.projectId, `đổi deadline task "${vals.title}" từ ${formatDateVN(oldDeadline)} sang ${formatDateVN(newDeadline)}`, t.groupId);
         } else if (oldDeadline && !newDeadline) {
-            await logAction(t.projectId, `xóa deadline của task "${vals.title}"`, t.groupId);
+            await logAction(t.projectId, `xóa deadline của task "${t.title}"`, t.groupId);
         }
       });
     });
@@ -921,17 +919,35 @@ if (gDeadline && newDeadline && newDeadline > gDeadline) {
     commentBtn.classList.remove("text-blue-600", "font-bold");
   }
   
-  // Cập nhật emoji
+// Cập nhật emoji
 const emojiSpan = row.querySelector(`#task-emoji-${tid}`);
 if (emojiSpan) {
-  if (t.emoji && typeof t.emoji === "object") {
-    // Hiển thị tất cả emoji của mọi user
-    emojiSpan.textContent = Object.values(t.emoji).join(" ");
-  } else {
-    emojiSpan.textContent = t.emoji || '';
-  }
-}
+    if (t.emoji && typeof t.emoji === "object") {
+        const emojiCounts = {};
+        // Đếm số lượng của từng loại emoji
+        Object.values(t.emoji).forEach(emoji => {
+            emojiCounts[emoji] = (emojiCounts[emoji] || 0) + 1;
+        });
 
+        // Xóa nội dung cũ
+        emojiSpan.innerHTML = "";
+        
+        // Tạo các div riêng cho từng emoji và số đếm
+        Object.entries(emojiCounts).forEach(([emoji, count]) => {
+            const emojiDiv = document.createElement("div");
+            emojiDiv.className = "relative inline-block";
+            emojiDiv.innerHTML = `
+                <span class="text-base">${emoji}</span>
+                <span class="absolute top-[-5px] right-[-5px] text-xs font-bold text-gray-700">
+                    ${count}
+                </span>
+            `;
+            emojiSpan.appendChild(emojiDiv);
+        });
+    } else {
+        emojiSpan.textContent = t.emoji || '';
+    }
+}
 
   const progressBar = row.querySelector(`#progress-container-${tid} div`);
   if (progressBar) {
@@ -966,6 +982,10 @@ if (t.deadline) {
       }
   }
 }
+
+
+
+
 
 // ===== Group CRUD (Thêm/Sửa/Xóa) =====
 async function addGroup(projectId) {
@@ -1147,8 +1167,6 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
-
-
 
 
 
