@@ -15,7 +15,7 @@ import {
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { showTaskBoard, isGuestUser } from "./tasks.js";
 
@@ -192,11 +192,10 @@ function setupProjectListener() {
     projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
       const projectCard = renderProject(doc);
-      projectArea.appendChild(projectCard); // ĐÃ DI CHUYỂN DÒNG NÀY VÀO ĐÂY
+      projectArea.appendChild(projectCard); // ĐÃ ĐẶT LẠI VỊ TRÍ ĐÚNG
 
-      // Cập nhật thời gian đếm ngược và màu sắc
       updateCountdownAndColor(projectCard, doc.data().endDate);
-      setInterval(() => updateCountdownAndColor(projectCard, doc.data().endDate), 60000); // Cập nhật mỗi phút
+      setInterval(() => updateCountdownAndColor(projectCard, doc.data().endDate), 60000);
     });
 
     document.querySelectorAll(".edit-btn").forEach((btn) => {
@@ -243,6 +242,17 @@ function setupProjectListener() {
 }
 
 // ===== Add / Update project =====
+addProjectBtn.addEventListener("click", () => {
+  isEditing = false;
+  projectModalTitle.textContent = "Tạo dự án mới";
+  projectTitleInput.value = "";
+  projectDescriptionInput.value = "";
+  projectStartInput.value = "";
+  projectEndInput.value = "";
+  projectCommentInput.value = "";
+  showModal("projectModal");
+});
+
 saveProjectBtn.addEventListener("click", async () => {
   const title = projectTitleInput.value.trim();
   const description = projectDescriptionInput.value.trim();
@@ -456,20 +466,8 @@ confirmDeleteBtn.addEventListener("click", async () => {
 cancelDeleteBtn.addEventListener("click", () => hideModal("deleteModal"));
 cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
 
-// ===== Add project modal =====
-addProjectBtn.addEventListener("click", () => {
-  isEditing = false;
-  projectModalTitle.textContent = "Tạo dự án mới";
-  projectTitleInput.value = "";
-  projectDescriptionInput.value = "";
-  projectStartInput.value = "";
-  projectEndInput.value = "";
-  projectCommentInput.value = "";
-  showModal("projectModal");
-});
-
 // ===== Auth listener =====
-onAuthStateChanged(auth, (user) => {
+auth.onAuthStateChanged((user) => {
   if (user) {
     addProjectBtn.classList.remove("hidden");
     setupProjectListener();
