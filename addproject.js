@@ -15,9 +15,9 @@ import {
   getDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { showTaskBoard, isGuestUser } from "./tasks.js";
+import { showTaskBoard } from "./tasks.js";
 
 // Debug log
 console.log("addproject.js loaded OK");
@@ -31,7 +31,6 @@ const firebaseConfig = {
   messagingSenderId: "1080268498085",
   appId: "1:1080268498085:web:767434c6a2c013b961d94c"
 };
-
 // ===== Init Firebase =====
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -134,6 +133,8 @@ function updateCountdownAndColor(projectCard, endDate) {
   let countdownElement = projectCard.querySelector(".countdown");
   if (!countdownElement) {
     countdownElement = document.createElement("p");
+    //countdownElement.className = "text-gray-800 text-3xl countdown";
+    // Thêm các lớp để tạo nền màu xanh và chữ trắng
     countdownElement.className = "bg-blue-500 text-white px-3 py-1 rounded-full text-lg countdown";
     projectCard.insertBefore(countdownElement, projectCard.querySelector("div.flex"));
   }
@@ -156,16 +157,9 @@ function renderProject(docSnap) {
 
   const projectCard = document.createElement("div");
   projectCard.className =
-    "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-110 mb-4";
+   "bg-white p-6 rounded-lg shadow-md border border-gray-200 transition-transform transform hover:scale-110 mb-4";
   
   const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().toLocaleString() : "-";
-
-  const actionButtonsHtml = isGuestUser
-  ? `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>`
-  : `<button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
-     <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
-     <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
-     <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>`;
 
   projectCard.innerHTML = `
     <h4 class="text-xl font-semibold text-blue-700 mb-2">${data.title}</h4>
@@ -176,11 +170,19 @@ function renderProject(docSnap) {
     <p class="text-gray-500 text-sm"><b>Người tạo:</b> ${displayName(data.createdBy)}</p>
     <p class="text-gray-500 text-sm mb-4"><b>Ngày tạo:</b> ${createdAt}</p>
     <div class="flex space-x-2 mt-2">
-      ${actionButtonsHtml}
+      <button data-id="${id}" class="view-tasks-btn bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm">👁️</button>
+      <button data-id="${id}" class="copy-btn bg-green-800 hover:bg-green-600 text-white px-3 py-1 rounded-md text-sm">📋</button>
+      <button data-id="${id}" class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-sm">✏️</button>
+      <button data-id="${id}" class="delete-btn bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md text-sm">🗑️</button>
     </div>
   `;
+  projectArea.appendChild(projectCard);
 
-  return projectCard;
+  // Cập nhật thời gian đếm ngược và màu sắc
+  updateCountdownAndColor(projectCard, data.endDate);
+
+  // Cập nhật realtime cho đếm ngược
+  setInterval(() => updateCountdownAndColor(projectCard, data.endDate), 60000); // Cập nhật mỗi phút
 }
 
 // ===== Real-time listener =====
@@ -191,11 +193,7 @@ function setupProjectListener() {
   onSnapshot(q, (snapshot) => {
     projectArea.innerHTML = "";
     snapshot.forEach((doc) => {
-      const projectCard = renderProject(doc);
-      projectArea.appendChild(projectCard);
-
-      updateCountdownAndColor(projectCard, doc.data().endDate);
-      setInterval(() => updateCountdownAndColor(projectCard, doc.data().endDate), 60000);
+      renderProject(doc);
     });
 
     document.querySelectorAll(".edit-btn").forEach((btn) => {
@@ -242,17 +240,6 @@ function setupProjectListener() {
 }
 
 // ===== Add / Update project =====
-addProjectBtn.addEventListener("click", () => {
-  isEditing = false;
-  projectModalTitle.textContent = "Tạo dự án mới";
-  projectTitleInput.value = "";
-  projectDescriptionInput.value = "";
-  projectStartInput.value = "";
-  projectEndInput.value = "";
-  projectCommentInput.value = "";
-  showModal("projectModal");
-});
-
 saveProjectBtn.addEventListener("click", async () => {
   const title = projectTitleInput.value.trim();
   const description = projectDescriptionInput.value.trim();
@@ -466,6 +453,18 @@ confirmDeleteBtn.addEventListener("click", async () => {
 cancelDeleteBtn.addEventListener("click", () => hideModal("deleteModal"));
 cancelProjectBtn.addEventListener("click", () => hideModal("projectModal"));
 
+// ===== Add project modal =====
+addProjectBtn.addEventListener("click", () => {
+  isEditing = false;
+  projectModalTitle.textContent = "Tạo dự án mới";
+  projectTitleInput.value = "";
+  projectDescriptionInput.value = "";
+  projectStartInput.value = "";
+  projectEndInput.value = "";
+  projectCommentInput.value = "";
+  showModal("projectModal");
+});
+
 // ===== Auth listener =====
 auth.onAuthStateChanged((user) => {
   if (user) {
@@ -514,6 +513,8 @@ function setupSidebar() {
     sidebar.classList.toggle("hidden");
   });
 
+
+
   const projectsCol = collection(db, "projects");
   const q = query(projectsCol, orderBy("createdAt", "desc"));
 
@@ -536,3 +537,11 @@ function setupSidebar() {
     });
   });
 }
+
+
+
+
+
+
+
+
