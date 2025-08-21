@@ -19,7 +19,7 @@ import {
   serverTimestamp,
   deleteField
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 
 // ===== Firebase Config (Sử dụng config từ file của bạn) =====
@@ -41,11 +41,38 @@ const auth = getAuth(app);
 // Biến lưu trữ người dùng hiện tại và trạng thái đăng nhập
 let currentUser = null;
 let isAuthReady = false;
-
+let isGuestUser = false; // THÊM DÒNG NÀY
+// Đảm bảo các hoạt động Firestore chỉ chạy sau khi xác thực xong
 // Đảm bảo các hoạt động Firestore chỉ chạy sau khi xác thực xong
 onAuthStateChanged(auth, (user) => {
   currentUser = user;
   isAuthReady = true;
+
+  // Thêm logic kiểm tra tài khoản khách
+  isGuestUser = user?.isAnonymous || false;
+  
+  // Tùy chỉnh hiển thị giao diện cho tài khoản khách
+  const addProjectBtn = document.getElementById("addProjectBtn");
+  const loginSection = document.getElementById("loginSection");
+  const mainContent = document.getElementById("mainContent");
+  const navButtons = document.getElementById("navButtons");
+
+  if (isGuestUser) {
+    if (addProjectBtn) addProjectBtn.classList.add('hidden');
+    if (navButtons) navButtons.classList.add('hidden');
+  } else {
+    if (addProjectBtn) addProjectBtn.classList.remove('hidden');
+    if (navButtons) navButtons.classList.remove('hidden');
+  }
+  
+  // Hiển thị giao diện chính sau khi xác thực
+  if (user) {
+    if (loginSection) loginSection.classList.add('hidden');
+    if (mainContent) mainContent.classList.remove('hidden');
+  } else {
+    if (loginSection) loginSection.classList.remove('hidden');
+    if (mainContent) mainContent.classList.add('hidden');
+  }
 });
 
 // ===== Helper cho Modal (Popup) =====
@@ -1168,6 +1195,19 @@ function setupGroupListeners(projectId) {
   }
 }
 
+// ... (cuối file tasks.js)
+// Gắn sự kiện cho nút Guest
+const guestBtn = document.getElementById('guestBtn');
+if (guestBtn) {
+  guestBtn.addEventListener('click', async () => {
+    try {
+      await signInAnonymously(auth);
+      console.log("Đăng nhập với tư cách khách thành công.");
+    } catch (error) {
+      console.error("Đăng nhập khách thất bại: ", error);
+    }
+  });
+}
 
 
 
