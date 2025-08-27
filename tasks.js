@@ -72,7 +72,8 @@ function openModal(title, fields, onSave) {
   fieldsDiv.innerHTML = "";
   fields.forEach(f => {
     if (f.type === "textarea") {
-      fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" class="border p-2 w-full rounded-md">${f.value || ""}</textarea>`;
+      fieldsDiv.innerHTML += `<textarea id="${f.id}" placeholder="${f.placeholder}" style="width:10cm; height:5cm" class="border p-2 rounded-md">${f.value || ""}</textarea>`;
+
     } else if (f.type === "color") {
       fieldsDiv.innerHTML += `
         <div class="flex items-center space-x-2">
@@ -1167,6 +1168,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
