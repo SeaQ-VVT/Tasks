@@ -1114,7 +1114,8 @@ if (gDeadline && deadline && deadline > gDeadline) {
 
 // ===== Kéo & Thả (Drag & Drop) =====
 function setupDragDrop() {
-  ["inprogressCol", "doneCol"].forEach((colId) => {
+  // Thêm groupContainer vào mảng các cột nhận thả
+  ["inprogressCol", "doneCol", "groupContainer"].forEach((colId) => {
     const col = document.getElementById(colId);
     if (!col) return;
 
@@ -1129,19 +1130,32 @@ function setupDragDrop() {
       const taskId = e.dataTransfer.getData("taskId");
       if (!taskId) return;
 
-      const newStatus = colId === "inprogressCol" ? "inprogress" : "done";
+      // Lấy trạng thái mới dựa trên cột thả
+      let newStatus;
+      if (colId === "inprogressCol") {
+        newStatus = "inprogress";
+      } else if (colId === "doneCol") {
+        newStatus = "done";
+      } else {
+        // Nếu thả vào cột "To Do"
+        newStatus = "todo";
+      }
 
       const taskRef = doc(db, "tasks", taskId);
       const taskSnap = await getDoc(taskRef);
       if (!taskSnap.exists()) return;
       const taskData = taskSnap.data();
-      const groupData = (await getDoc(doc(db, "groups", taskData.groupId))).data();
 
-      // Cập nhật trạng thái và tiến độ
+      // Kiểm tra nếu trạng thái cũ và mới giống nhau thì không làm gì cả
+      if (taskData.status === newStatus) {
+        return;
+      }
+
+      // Nếu có thay đổi, tiến hành cập nhật Firestore và ghi log
       const updatePayload = {
         status: newStatus,
         updatedAt: serverTimestamp(),
-        updatedBy: currentUser?.email || "Ẩn danh"
+        updatedBy: currentUser?.email || "Ẩn danh",
       };
 
       if (newStatus === "done") {
@@ -1150,17 +1164,20 @@ function setupDragDrop() {
 
       await updateDoc(taskRef, updatePayload);
 
-      // Ghi log hoạt động
       let logMessage = `chuyển task "${taskData.title}" sang trạng thái "${newStatus}"`;
       if (newStatus === "done") {
         logMessage += ` và hoàn thành 100%`;
       }
-      logMessage += ` trong group "${groupData.title}"`;
+      
+      const groupData = (await getDoc(doc(db, "groups", taskData.groupId))).data();
+      if (groupData) {
+        logMessage += ` trong group "${groupData.title}"`;
+      }
+      
       await logAction(taskData.projectId, logMessage);
     });
   });
 }
-
 // ===== Listener cho các nút chức năng chính =====
 function setupGroupListeners(projectId) {
   const addGroupBtn = document.getElementById("addGroupBtn");
@@ -1168,6 +1185,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
