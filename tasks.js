@@ -1178,6 +1178,7 @@ function setupDragDrop() {
     });
   });
 }
+
 // ===== Listener cho các nút chức năng chính =====
 function setupGroupListeners(projectId) {
   const addGroupBtn = document.getElementById("addGroupBtn");
@@ -1185,6 +1186,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
