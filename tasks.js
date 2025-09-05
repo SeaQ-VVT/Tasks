@@ -739,10 +739,12 @@ function renderTask(docSnap) {
     col.appendChild(row);
 
     // Sự kiện kéo thả
-    row.addEventListener("dragstart", (e) => {
-      e.dataTransfer.setData("type", "task");
-      e.dataTransfer.setData("taskId", tid);
-    });
+row.addEventListener("dragstart", (e) => {
+  e.dataTransfer.setData("type", "task");
+  e.dataTransfer.setData("taskId", tid);
+  // Thêm trạng thái của task vào dữ liệu kéo
+  e.dataTransfer.setData("taskStatus", t.status);
+});
     
 // Sự kiện chọn emoji
 row.querySelector(".emoji-picker-btn").addEventListener("click", (e) => {
@@ -1114,7 +1116,6 @@ if (gDeadline && deadline && deadline > gDeadline) {
 
 // ===== Kéo & Thả (Drag & Drop) =====
 function setupDragDrop() {
-  // Thêm groupContainer vào mảng các cột nhận thả
   ["inprogressCol", "doneCol", "groupContainer"].forEach((colId) => {
     const col = document.getElementById(colId);
     if (!col) return;
@@ -1128,28 +1129,29 @@ function setupDragDrop() {
       if (type !== "task") return;
 
       const taskId = e.dataTransfer.getData("taskId");
-      if (!taskId) return;
+      const oldStatus = e.dataTransfer.getData("taskStatus");
 
-      // Lấy trạng thái mới dựa trên cột thả
+      if (!taskId || !oldStatus) return;
+
       let newStatus;
       if (colId === "inprogressCol") {
         newStatus = "inprogress";
       } else if (colId === "doneCol") {
         newStatus = "done";
       } else {
-        // Nếu thả vào cột "To Do"
         newStatus = "todo";
       }
 
+      // Kiểm tra nếu trạng thái cũ và mới giống nhau thì không làm gì cả
+      if (oldStatus === newStatus) {
+        return;
+      }
+
+      // Lấy dữ liệu task để ghi log, không cần lấy toàn bộ doc nếu không cần
       const taskRef = doc(db, "tasks", taskId);
       const taskSnap = await getDoc(taskRef);
       if (!taskSnap.exists()) return;
       const taskData = taskSnap.data();
-
-      // Kiểm tra nếu trạng thái cũ và mới giống nhau thì không làm gì cả
-      if (taskData.status === newStatus) {
-        return;
-      }
 
       // Nếu có thay đổi, tiến hành cập nhật Firestore và ghi log
       const updatePayload = {
@@ -1178,7 +1180,6 @@ function setupDragDrop() {
     });
   });
 }
-
 // ===== Listener cho các nút chức năng chính =====
 function setupGroupListeners(projectId) {
   const addGroupBtn = document.getElementById("addGroupBtn");
@@ -1186,6 +1187,7 @@ function setupGroupListeners(projectId) {
     addGroupBtn.addEventListener("click", () => addGroup(projectId));
   }
 }
+
 
 
 
